@@ -320,7 +320,7 @@ async function startGame() {
     lines,
     idx: 0,                    // next line index to reach
     quizIdx: null,             // line currently being quizzed
-    state: 'loading',          // loading | playing | quiz | feedback | drivereplay | done
+    state: 'loading',          // loading | playing | quiz | feedback | linerepeat | builderplay | looppause | done
     revealIdx: null,           // line shown revealed during a drive-mode replay
     loopSel: null,             // first line tapped while picking a loop section
     loopStart: null,           // active A-B loop range (line indices)
@@ -381,12 +381,11 @@ async function startGame() {
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
           if (isAdPlaying()) return;   // an ad finishing is not the song finishing
-          if (currentSong.mode === 'builder') {
-            if (game.state === 'linerepeat') {
-              player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.5), true);
-              player.playVideo();
-            }
-            else if (game.state === 'builderplay') builderLineEnded();
+          if (game.state === 'linerepeat') {
+            player.seekTo(Math.max(0, lineTime(game.repLine) - 0.5), true);
+            player.playVideo();
+          } else if (currentSong.mode === 'builder') {
+            if (game.state === 'builderplay') builderLineEnded();
             else if (builderTarget()) restartBuilderPass();
             else builderComplete();
           } else if (game.loopStart !== null) { wrapLoop(); player.playVideo(); }
@@ -450,12 +449,12 @@ function tick() {
   const t = player.getCurrentTime();
   if (typeof t !== 'number') return;
 
-  // builder "Loop it": seamlessly cycle the target line, no pauses
+  // "Loop it": seamlessly cycle one line, any mode, no pauses
   if (game.state === 'linerepeat') {
-    const end = game.builderLine + 1 < game.lines.length
-      ? lineTime(game.builderLine + 1) - LEAD
-      : lineTime(game.builderLine) + 6;
-    if (t >= end) player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.5), true);
+    const end = game.repLine + 1 < game.lines.length
+      ? lineTime(game.repLine + 1) - LEAD
+      : lineTime(game.repLine) + 6;
+    if (t >= end) player.seekTo(Math.max(0, lineTime(game.repLine) - 0.5), true);
     return;
   }
 
@@ -465,20 +464,6 @@ function tick() {
       ? lineTime(game.builderLine + 1) - LEAD
       : lineTime(game.builderLine) + 6;
     if (t >= end) builderLineEnded();
-    return;
-  }
-
-  // drive mode: replaying the missed line with the text shown; when it ends, ask again
-  if (game.state === 'drivereplay') {
-    const end = game.quizIdx + 1 < game.lines.length
-      ? lineTime(game.quizIdx + 1) - LEAD
-      : lineTime(game.quizIdx) + 6;
-    if (t >= end) {
-      player.pauseVideo();
-      player.seekTo(Math.max(0, lineTime(game.quizIdx) - LEAD), true);
-      game.revealIdx = null;
-      enterQuiz(game.quizIdx);
-    }
     return;
   }
 
@@ -678,23 +663,35 @@ function builderAnswer(got, skipped = false) {
   player.playVideo();
 }
 
-// "Loop it": cycle just the target line continuously, word revealed, no card, no prompts —
-// only a floating pill to tap when the line has sunk in
-function builderStartLineLoop() {
+// "Loop it": cycle just the current line continuously, revealed, no card, no prompts —
+// pure listening. Only a floating pill to tap when it has sunk in. Works in every mode.
+function startLineLoop() {
   if (!game || game.state !== 'quiz') return;
-  game.builderReveal = true;
+  const builder = currentSong.mode === 'builder';
+  game.repLine = builder ? game.builderLine : game.quizIdx;
+  if (builder) game.builderReveal = true;
+  else game.revealIdx = game.quizIdx;
   game.state = 'linerepeat';
   $('#quiz-area').classList.add('hidden');
   $('#stop-loop-btn').classList.remove('hidden');
   renderLyrics();
-  player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.5), true);
+  player.seekTo(Math.max(0, lineTime(game.repLine) - 0.5), true);
   player.playVideo();
 }
 
 $('#stop-loop-btn').addEventListener('click', () => {
   if (!game || game.state !== 'linerepeat') return;
   $('#stop-loop-btn').classList.add('hidden');
-  restartBuilderPass();          // hide the word and test the same one with a run-up
+  if (currentSong.mode === 'builder') return restartBuilderPass();  // re-test the word with a run-up
+  // drive: hide the line again and ride in from the previous one; the same quiz pauses again
+  game.revealIdx = null;
+  const line = game.lines[game.quizIdx];
+  line.attempts = (line.attempts || 0) + 1;
+  game.state = 'playing';
+  renderLyrics();
+  const seekT = game.quizIdx > 0 ? lineTime(game.quizIdx - 1) - 0.5 : lineTime(0) - 3;
+  player.seekTo(Math.max(0, seekT), true);
+  player.playVideo();
 });
 
 function builderLineEnded() {
@@ -767,7 +764,7 @@ function enterQuiz(i) {
   $('#hint-btn').classList.remove('hidden');
   $('#span-btn').classList.add('hidden');
   $('#drive-miss').classList.remove('hidden');
-  $('#drive-miss').textContent = '↻ Repeat';
+  $('#drive-miss').textContent = '🔁 Loop it';
   $('#drive-got').textContent = 'Next →';
   renderHintWords(line);
   renderLyrics();
@@ -848,18 +845,7 @@ $('#drive-got').addEventListener('click', () => {
 
 $('#drive-miss').addEventListener('click', () => {
   if (!game || game.state !== 'quiz' || !player) return;
-  if (currentSong.mode === 'builder') return builderStartLineLoop();
-  const line = game.lines[game.quizIdx];
-  line.attempts = (line.attempts || 0) + 1;
-  game.streak = 0;
-  updateStats();
-  // rewind to the start of the line, show it, play it, then ask again
-  game.revealIdx = game.quizIdx;
-  game.state = 'drivereplay';
-  $('#quiz-area').classList.add('hidden');
-  renderLyrics();
-  player.seekTo(Math.max(0, lineTime(game.quizIdx) - LEAD), true);
-  player.playVideo();
+  startLineLoop();   // same continuous listening loop in every mode
 });
 
 $('#skip-btn').addEventListener('click', () => {
