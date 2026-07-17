@@ -16,12 +16,12 @@ The site is fully static (`docs/` folder) — lyrics come straight from the free
 
 1. Pick a song from the **🐰 Bad Bunny Top 10 starter pack** (lyrics + video pre-wired),
    or **search any song** and paste its YouTube link ("Find it ↗" opens a YouTube search).
-2. Pick a difficulty:
-   - **Easy** — pick the missing word from 4 choices
-   - **Medium** — type the missing words (~40% blanked)
-   - **Hard** — type the entire next line
+2. Pick a mode:
+   - **Quiz** — pick the missing word from 4 choices
    - **🚗 Drive** — hands-free: say the line out loud, tap **✓ Got it** or **↻ Missed it**.
      A miss rewinds, replays the line with the words shown, then quizzes you again.
+
+   (Typing modes were removed — not practical mid-song. Voice recognition is planned.)
 3. The song plays and pauses before each quizzed line. Answer, hear the line, keep going.
 4. **Loop a section:** tap the first and last line of a section in the lyrics panel and
    the app repeats just that part (chorus, fast verse…), re-quizzing you every pass.

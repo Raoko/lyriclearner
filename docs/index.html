@@ -58,10 +58,8 @@
     <div class="setup-block">
       <label>Difficulty</label>
       <div class="seg" id="mode-seg">
-        <button data-mode="choice" class="seg-btn active">Easy<span>pick the word</span></button>
-        <button data-mode="blanks" class="seg-btn">Medium<span>type the blanks</span></button>
-        <button data-mode="full" class="seg-btn">Hard<span>type the whole line</span></button>
-        <button data-mode="drive" class="seg-btn">🚗 Drive<span>no typing, self-check</span></button>
+        <button data-mode="choice" class="seg-btn active">Quiz<span>pick the missing word</span></button>
+        <button data-mode="drive" class="seg-btn">🚗 Drive<span>hands-free, self-check</span></button>
       </div>
     </div>
 
@@ -115,11 +113,6 @@
         <button id="drive-miss" class="drive-btn miss">↻ Missed it</button>
         <button id="drive-got" class="drive-btn got">✓ Got it</button>
       </div>
-      <form id="type-form" class="hidden">
-        <input id="type-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
-               placeholder="Type the next line…">
-        <button type="submit">Check</button>
-      </form>
       <div id="hint-words" class="hint-words hidden"></div>
       <div class="quiz-actions">
         <button id="hint-btn" class="chip">💡 Reveal a word</button>

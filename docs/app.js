@@ -171,6 +171,8 @@ function renderStarterPack() {
 
 function openSetup(song) {
   currentSong = { mode: 'choice', freq: 1, ...song };
+  // typing modes were removed; migrate songs saved with one
+  if (!['choice', 'drive'].includes(currentSong.mode)) currentSong.mode = 'choice';
   $('#setup-title').textContent = song.trackName;
   $('#setup-artist').textContent = song.artistName;
   $('#yt-url').value = song.videoId ? 'https://www.youtube.com/watch?v=' + song.videoId : '';
@@ -250,6 +252,7 @@ function levenshtein(a, b) {
   return dp[a.length][b.length];
 }
 
+// kept for the planned voice-recognition mode: fuzzy word matching against sung/spoken input
 function wordMatches(guess, target) {
   if (!guess) return false;
   if (guess === target) return true;
@@ -506,7 +509,6 @@ function enterQuiz(i) {
   $('#quiz-area').classList.remove('hidden');
   $('#feedback-area').classList.add('hidden');
   $('#choice-buttons').classList.add('hidden');
-  $('#type-form').classList.add('hidden');
   $('#drive-buttons').classList.add('hidden');
   $('#replay-btn').classList.remove('hidden');
   renderHintWords(line);
@@ -521,7 +523,7 @@ function enterQuiz(i) {
       : 'Say the next line out loud, then check yourself:';
     $('#drive-buttons').classList.remove('hidden');
     $('#replay-btn').classList.add('hidden');   // "Missed it" already replays the line
-  } else if (mode === 'choice') {
+  } else {
     // blank one meaningful word, offer 4 choices
     const candidates = ws.map((w, j) => ({ w, j })).filter(x => x.w.norm.length >= 3);
     const pick = candidates.length
@@ -546,21 +548,10 @@ function enterQuiz(i) {
         const right = normWord(opt) === pick.w.norm;
         btn.classList.add(right ? 'right' : 'wrong');
         grid.querySelectorAll('button').forEach(b => b.disabled = true);
-        setTimeout(() => resolveQuiz(right ? 1 : 0, line.text, null), right ? 350 : 900);
+        setTimeout(() => resolveQuiz(right ? 1 : 0, line.text), right ? 350 : 900);
       });
       grid.appendChild(btn);
     }
-  } else if (mode === 'blanks') {
-    // blank ~40% of words; type them in order
-    const n = Math.max(1, Math.round(ws.length * 0.4));
-    const idxs = shuffle(ws.map((_, j) => j)).slice(0, n).sort((a, b) => a - b);
-    line.blankIdx = idxs;
-    $('#quiz-prompt').innerHTML = 'Fill in the missing words (in order): ' + promptWithBlanks(ws, idxs);
-    showTypeForm('Missing words, separated by spaces…');
-  } else {
-    line.blankIdx = ws.map((_, j) => j);
-    $('#quiz-prompt').textContent = 'Type the whole next line:';
-    showTypeForm('Type the next line…');
   }
 }
 
@@ -568,28 +559,6 @@ function promptWithBlanks(ws, blankIdx) {
   return '<span class="blanked">' + ws.map((w, j) =>
     blankIdx.includes(j) ? '____' : escapeHtml(w.raw)).join(' ') + '</span>';
 }
-
-function showTypeForm(placeholder) {
-  const form = $('#type-form');
-  form.classList.remove('hidden');
-  const input = $('#type-input');
-  input.value = '';
-  input.placeholder = placeholder;
-  input.focus();
-}
-
-$('#type-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  if (!game || game.state !== 'quiz') return;
-  const line = game.lines[game.quizIdx];
-  const ws = words(line.text);
-  const targets = line.blankIdx.map(j => ws[j]);
-  const guesses = words($('#type-input').value);
-
-  const perWord = targets.map((tw, k) => wordMatches(guesses[k] ? guesses[k].norm : '', tw.norm));
-  const frac = perWord.filter(Boolean).length / targets.length;
-  resolveQuiz(frac, line.text, { ws, blankIdx: line.blankIdx, perWord });
-});
 
 function renderHintWords(line) {
   const el = $('#hint-words');
@@ -614,7 +583,7 @@ $('#drive-got').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
   const line = game.lines[game.quizIdx];
   // full credit first try, half credit after replays
-  resolveQuiz(line.attempts ? 0.5 : 1, line.text, null);
+  resolveQuiz(line.attempts ? 0.5 : 1, line.text);
   resumeAfterFeedback();   // no feedback card in drive mode — reveal in the panel and keep rolling
 });
 
@@ -635,7 +604,7 @@ $('#drive-miss').addEventListener('click', () => {
 
 $('#skip-btn').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
-  resolveQuiz(0, game.lines[game.quizIdx].text, null, true);
+  resolveQuiz(0, game.lines[game.quizIdx].text, true);
 });
 
 $('#replay-btn').addEventListener('click', () => {
@@ -646,7 +615,7 @@ $('#replay-btn').addEventListener('click', () => {
   game.state = 'playing';   // ticker will re-pause at the same quiz line
 });
 
-function resolveQuiz(frac, fullText, detail, skipped = false) {
+function resolveQuiz(frac, fullText, skipped = false) {
   const line = game.lines[game.quizIdx];
   if (line.hints) frac = Math.max(0, frac - line.hints / words(fullText).length);  // peeked words aren't yours
   const good = frac >= 0.8;
@@ -666,17 +635,7 @@ function resolveQuiz(frac, fullText, detail, skipped = false) {
   $('#quiz-area').classList.add('hidden');
   const fb = $('#feedback-line');
 
-  if (detail) {
-    // show the real line with the guessed blanks colored
-    let k = 0;
-    fb.innerHTML = detail.ws.map((w, j) => {
-      if (!detail.blankIdx.includes(j)) return escapeHtml(w.raw);
-      const cls = detail.perWord[k++] ? 'w-good' : 'w-bad';
-      return `<span class="${cls}">${escapeHtml(w.raw)}</span>`;
-    }).join(' ');
-  } else {
-    fb.innerHTML = `<span class="${good ? 'w-good' : ''}">${escapeHtml(fullText)}</span>`;
-  }
+  fb.innerHTML = `<span class="${good ? 'w-good' : ''}">${escapeHtml(fullText)}</span>`;
   const verdict = skipped ? 'Skipped' :
     good ? pickRandom(['Nailed it! 🎯', 'Perfect! ⭐', 'You know this one! 🔥']) :
     frac > 0 ? `Almost — ${Math.round(frac * 100)}% right` :

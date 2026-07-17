@@ -206,19 +206,6 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 .drive-btn.miss { background: #331119; border: 1px solid var(--bad); color: var(--bad); }
 .drive-btn:active { transform: scale(0.97); }
 
-#type-form { display: flex; gap: 8px; }
-#type-form.hidden { display: none; }
-#type-form input {
-  flex: 1; padding: 14px 16px; font-size: 1rem;
-  background: var(--card); color: var(--text);
-  border: 1px solid #2c3040; border-radius: 12px; outline: none; min-width: 0;
-}
-#type-form input:focus { border-color: var(--accent); }
-#type-form button {
-  padding: 0 20px; font-weight: 700; font-size: 0.95rem;
-  background: var(--accent); color: #fff; border: 0; border-radius: 12px; cursor: pointer;
-}
-
 .quiz-actions { display: flex; gap: 10px; margin-top: 12px; justify-content: center; flex-wrap: wrap; }
 
 .hint-words {
@@ -268,6 +255,6 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
   .game-stats { gap: 8px; font-size: 0.8rem; }
   .choice-grid button { min-height: 52px; }
   .chip { padding: 10px 16px; }
-  #continue-btn, #type-form button { min-height: 48px; }
+  #continue-btn { min-height: 48px; }
   .quiz-actions { flex-wrap: wrap; }
 }
