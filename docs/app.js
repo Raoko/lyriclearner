@@ -288,22 +288,29 @@ async function startGame() {
     quizIdx: null,             // line currently being quizzed
     state: 'loading',          // loading | playing | quiz | feedback | drivereplay | done
     revealIdx: null,           // line shown revealed during a drive-mode replay
+    loopSel: null,             // first line tapped while picking a loop section
+    loopStart: null,           // active A-B loop range (line indices)
+    loopEnd: null,
     score: 0,
     streak: 0,
     bestStreak: 0,
-    answered: 0,
-    correct: 0,
     total: 0,
     ticker: null,
   };
 
   // quiz every Nth line, never the very first (you haven't heard anything yet)
-  game.lines.forEach((ln, i) => { ln.quiz = i > 0 && i % currentSong.freq === 0; ln.result = null; });
+  game.lines.forEach((ln, i) => {
+    ln.quiz = i > 0 && i % currentSong.freq === 0;
+    ln.result = null;
+    ln.frac = 0;
+    ln.attempts = 0;
+  });
   game.total = game.lines.filter(l => l.quiz).length;
 
   showScreen('game');
   renderLyrics();
   updateStats();
+  updateLoopBar();
   $('#quiz-area').classList.add('hidden');
   $('#feedback-area').classList.add('hidden');
   $('#start-overlay').classList.add('hidden');
@@ -318,7 +325,10 @@ async function startGame() {
       // iOS blocks autoplay with sound — playback must start from a real tap
       onReady: () => { $('#start-overlay').classList.remove('hidden'); },
       onStateChange: (e) => {
-        if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') finishGame();
+        if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
+          if (game.loopStart !== null) { wrapLoop(); player.playVideo(); }
+          else finishGame();
+        }
       },
     },
   });
@@ -364,6 +374,14 @@ function tick() {
 
   if (game.state !== 'playing') return;
 
+  // active loop: jump back to the section start once its last line has played
+  if (game.loopStart !== null) {
+    const wrapAt = game.loopEnd + 1 < game.lines.length
+      ? lineTime(game.loopEnd + 1) - LEAD
+      : lineTime(game.loopEnd) + 6;
+    if (t >= wrapAt) return wrapLoop();
+  }
+
   // advance past lines whose moment has passed
   while (game.idx < game.lines.length && t >= lineTime(game.idx) - LEAD) {
     const line = game.lines[game.idx];
@@ -375,7 +393,73 @@ function tick() {
     game.idx++;
     renderLyrics();
   }
-  if (game.idx >= game.lines.length) finishGame();
+  if (game.idx >= game.lines.length && game.loopStart === null) finishGame();
+}
+
+/* ---------- A-B section loop ---------- */
+
+function wrapLoop() {
+  // re-arm the quizzes inside the loop and replay the section
+  for (let i = game.loopStart; i <= game.loopEnd; i++) {
+    game.lines[i].result = null;
+    game.lines[i].attempts = 0;
+  }
+  game.idx = game.loopStart;
+  game.quizIdx = null;
+  game.revealIdx = null;
+  renderLyrics();
+  player.seekTo(Math.max(0, lineTime(game.loopStart) - 2), true);
+}
+
+function onLineTap(i) {
+  if (!game || game.state === 'done') return;
+  if (game.loopStart !== null) return;              // loop active — use ✕ Clear loop
+  if (game.loopSel === null) {
+    game.loopSel = i;                               // first tap: arm the section start
+    updateLoopBar();
+    renderLyrics();
+  } else {
+    const a = Math.min(game.loopSel, i), b = Math.max(game.loopSel, i);
+    game.loopSel = null;
+    startLoop(a, b);
+  }
+}
+
+function startLoop(a, b) {
+  game.loopStart = a;
+  game.loopEnd = b;
+  // cancel any in-flight quiz and jump straight into the section
+  game.state = 'playing';
+  $('#quiz-area').classList.add('hidden');
+  $('#feedback-area').classList.add('hidden');
+  updateLoopBar();
+  wrapLoop();
+  player.playVideo();
+}
+
+$('#loop-clear').addEventListener('click', () => {
+  if (!game) return;
+  game.loopSel = null;
+  game.loopStart = null;
+  game.loopEnd = null;
+  updateLoopBar();
+  renderLyrics();
+});
+
+function updateLoopBar() {
+  const hint = $('#loop-hint'), clear = $('#loop-clear');
+  if (game.loopStart !== null) {
+    hint.textContent = `🔁 Looping lines ${game.loopStart + 1}–${game.loopEnd + 1}`;
+    clear.textContent = '✕ Clear loop';
+    clear.classList.remove('hidden');
+  } else if (game.loopSel !== null) {
+    hint.textContent = '🔁 Now tap the last line of the section';
+    clear.textContent = '✕ Cancel';
+    clear.classList.remove('hidden');
+  } else {
+    hint.textContent = '🔁 Tap a lyric line to loop a section';
+    clear.classList.add('hidden');
+  }
 }
 
 /* ---------- quiz ---------- */
@@ -513,14 +597,13 @@ function resolveQuiz(frac, fullText, detail, skipped = false) {
   const line = game.lines[game.quizIdx];
   const good = frac >= 0.8;
   line.result = good ? 'good' : (frac > 0 ? 'partial' : 'bad');
-  game.answered++;
+  line.frac = frac;   // latest attempt wins, so loop practice updates your result
   if (good) {
-    game.correct++;
     game.streak++;
     game.bestStreak = Math.max(game.bestStreak, game.streak);
     game.score += 10 + Math.min(game.streak, 5) * 2;
   } else {
-    if (frac > 0) { game.correct += frac; game.score += Math.round(frac * 10); }
+    if (frac > 0) game.score += Math.round(frac * 10);
     game.streak = 0;
   }
   updateStats();
@@ -573,6 +656,9 @@ function renderLyrics() {
   game.lines.forEach((line, i) => {
     const div = document.createElement('div');
     div.className = 'lyr-line';
+    if (i === game.loopSel) div.classList.add('loop-sel');
+    if (game.loopStart !== null && i >= game.loopStart && i <= game.loopEnd) div.classList.add('in-loop');
+    div.addEventListener('click', () => onLineTap(i));
     if (i < game.idx) {
       div.classList.add('past');
       if (line.result === 'good') div.innerHTML = `<span class="w-good">✓</span> ${escapeHtml(line.text)}`;
@@ -595,9 +681,10 @@ function renderLyrics() {
 }
 
 function updateStats() {
+  const answered = game.lines.filter(l => l.quiz && l.result !== null).length;
   $('#stat-score').textContent = game.score + ' pts';
   $('#stat-streak').textContent = '🔥 ' + game.streak;
-  $('#stat-progress').textContent = game.answered + '/' + game.total;
+  $('#stat-progress').textContent = answered + '/' + game.total;
 }
 
 /* ---------- sync offset ---------- */
@@ -618,7 +705,8 @@ function finishGame() {
   clearInterval(game.ticker);
   try { player.pauseVideo(); } catch {}
 
-  const acc = game.total ? Math.round((game.correct / game.total) * 100) : 0;
+  const correct = game.lines.filter(l => l.quiz).reduce((s, l) => s + (l.frac || 0), 0);
+  const acc = game.total ? Math.round((correct / game.total) * 100) : 0;
   $('#res-accuracy').textContent = acc + '%';
   $('#res-score').textContent = game.score;
   $('#res-streak').textContent = game.bestStreak;

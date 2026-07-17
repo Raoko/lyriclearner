@@ -23,6 +23,9 @@ The site is fully static (`docs/` folder) — lyrics come straight from the free
    - **🚗 Drive** — hands-free: say the line out loud, tap **✓ Got it** or **↻ Missed it**.
      A miss rewinds, replays the line with the words shown, then quizzes you again.
 3. The song plays and pauses before each quizzed line. Answer, hear the line, keep going.
+4. **Loop a section:** tap the first and last line of a section in the lyrics panel and
+   the app repeats just that part (chorus, fast verse…), re-quizzing you every pass.
+   Your latest attempt at each line is what counts. Tap ✕ to clear the loop.
 
 If the pauses feel early or late (e.g. the video has an intro), use the **−0.25s / +0.25s**
 sync buttons during the game — the offset is saved per song.

@@ -155,12 +155,24 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 }
 .chip:hover { border-color: var(--accent); }
 
+.loop-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 14px; min-height: 34px;
+}
+.loop-bar .hint { margin: 0; }
+
 #lyrics-panel {
-  margin-top: 14px; background: var(--card); border-radius: 12px;
+  margin-top: 8px; background: var(--card); border-radius: 12px;
   padding: 14px 18px; max-height: 200px; overflow-y: auto;
   font-size: 1.02rem; line-height: 1.9;
 }
-.lyr-line { color: var(--muted); transition: color 0.2s; }
+.lyr-line {
+  color: var(--muted); transition: color 0.2s; cursor: pointer;
+  border-left: 3px solid transparent; padding-left: 8px; margin-left: -8px;
+  -webkit-user-select: none; user-select: none;
+}
+.lyr-line.loop-sel { border-left-color: var(--warn); }
+.lyr-line.in-loop { border-left-color: var(--accent); background: rgba(124, 92, 255, 0.08); }
 .lyr-line.past { color: var(--text); }
 .lyr-line.current { color: var(--accent-hi); font-weight: 700; }
 .lyr-line.future { color: #3a3f52; letter-spacing: 2px; }
@@ -242,7 +254,8 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
   .sync-bar { order: 2; justify-content: center; }
   #quiz-area { order: 3; }
   #feedback-area { order: 4; }
-  #lyrics-panel { order: 5; max-height: 34vh; font-size: 0.95rem; }
+  .loop-bar { order: 5; }
+  #lyrics-panel { order: 6; max-height: 34vh; font-size: 0.95rem; }
 
   .seg-btn { padding: 12px 4px; font-size: 0.85rem; }
   .seg-btn span { display: none; }
