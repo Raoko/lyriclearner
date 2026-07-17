@@ -298,6 +298,16 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
   font-size: 1rem; padding: 10px 16px;
 }
 
+#stop-loop-btn {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom) + 22px); z-index: 60;
+  background: var(--accent); color: #fff; border: 0; cursor: pointer;
+  padding: 15px 26px; border-radius: 999px;
+  font-size: 1rem; font-weight: 700;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.45);
+}
+#stop-loop-btn:active { transform: translateX(-50%) scale(0.96); }
+
 /* ---------- Results ---------- */
 .results-card { text-align: center; padding-top: 60px; }
 #results-emoji { font-size: 3.4rem; }

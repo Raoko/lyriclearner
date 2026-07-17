@@ -375,7 +375,7 @@ async function startGame() {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
           if (currentSong.mode === 'builder') {
             if (game.state === 'linerepeat') {
-              player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.6), true);
+              player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.5), true);
               player.playVideo();
             }
             else if (game.state === 'builderplay') builderLineEnded();
@@ -415,6 +415,7 @@ $('#start-overlay').addEventListener('click', () => {
 
 function stopGame() {
   setLyricsFull(false);
+  $('#stop-loop-btn').classList.add('hidden');
   if (game && game.ticker) clearInterval(game.ticker);
   if (player) { try { player.destroy(); } catch {} player = null; }
   game = null;
@@ -434,7 +435,7 @@ function tick() {
     const end = game.builderLine + 1 < game.lines.length
       ? lineTime(game.builderLine + 1) - LEAD
       : lineTime(game.builderLine) + 6;
-    if (t >= end) player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.6), true);
+    if (t >= end) player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.5), true);
     return;
   }
 
@@ -659,21 +660,24 @@ function builderAnswer(got, skipped = false) {
   player.playVideo();
 }
 
-// "Loop it": replay just the target line continuously, word revealed, no pauses —
-// practice singing along, then tap Ready to be tested on it again
+// "Loop it": cycle just the target line continuously, word revealed, no card, no prompts —
+// only a floating pill to tap when the line has sunk in
 function builderStartLineLoop() {
   if (!game || game.state !== 'quiz') return;
   game.builderReveal = true;
   game.state = 'linerepeat';
-  $('#quiz-prompt').textContent = '🔁 Looping this line — sing along until it sticks:';
-  $('#drive-miss').classList.add('hidden');
-  $('#drive-got').textContent = '✓ Ready — test me';
-  $('#skip-btn').classList.add('hidden');
-  $('#span-btn').classList.add('hidden');
+  $('#quiz-area').classList.add('hidden');
+  $('#stop-loop-btn').classList.remove('hidden');
   renderLyrics();
-  player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.6), true);
+  player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.5), true);
   player.playVideo();
 }
+
+$('#stop-loop-btn').addEventListener('click', () => {
+  if (!game || game.state !== 'linerepeat') return;
+  $('#stop-loop-btn').classList.add('hidden');
+  restartBuilderPass();          // hide the word and test the same one with a run-up
+});
 
 function builderLineEnded() {
   player.pauseVideo();
@@ -816,13 +820,7 @@ $('#hint-btn').addEventListener('click', () => {
 });
 
 $('#drive-got').addEventListener('click', () => {
-  if (!game) return;
-  if (currentSong.mode === 'builder' && game.state === 'linerepeat') {
-    // done practicing — hide the word and test the same one again with a run-up
-    $('#quiz-area').classList.add('hidden');
-    return restartBuilderPass();
-  }
-  if (game.state !== 'quiz') return;
+  if (!game || game.state !== 'quiz') return;
   if (currentSong.mode === 'builder') return builderAnswer(true);
   const line = game.lines[game.quizIdx];
   // full credit first try, half credit after replays
