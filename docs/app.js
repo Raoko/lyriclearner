@@ -7,6 +7,7 @@ const LRCLIB = 'https://lrclib.net/api';   // allows CORS, so this works on stat
 
 // lyric-video uploads: no long intros, so they track the LRC timing better than official videos
 const STARTER_PACK = [
+  { trackName: 'Ch y la Pizza', artistName: 'Fuerza Regida & Natanael Cano', lrclibId: 34414351, videoId: 'lvdwUbP_Vug' },
   { trackName: 'Tití Me Preguntó', artistName: 'Bad Bunny', lrclibId: 17906524, videoId: 'qBUKfQRbzuk' },
   { trackName: 'Me Porto Bonito', artistName: 'Bad Bunny ft. Chencho Corleone', lrclibId: 20453735, videoId: 'OblNX5rGJJM' },
   { trackName: 'Dákiti', artistName: 'Bad Bunny & Jhay Cortez', lrclibId: 576, videoId: '30YlLGeUReY' },
