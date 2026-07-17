@@ -609,17 +609,12 @@ function builderTarget() {
   return game.builderCount < game.builderWords.length ? game.builderWords[game.builderCount] : null;
 }
 
-// how many leading words of line i are hidden right now
+// blanks exist only at test time: the tested line hides completely, everything else
+// always shows in full — playback is for hearing and reading, tests are for recall
 function builderHiddenInLine(i) {
   const info = game.builderLineInfo[i];
   if (!info) return 0;
-  // while looping a line for practice, show every word — the loop is for absorbing it
-  if (game.state === 'linerepeat' && i === game.repLine) return 0;
-  // while being tested, the whole line is blank — recall it all from memory
-  if (game.state === 'quiz' && i === game.builderLine) return info.count;
-  // learned words stay hidden; the target word is hidden too unless "Show me" revealed it
-  const eff = (game.builderReveal && game.builderLine === i) ? game.builderCount : game.builderCount + 1;
-  return Math.max(0, Math.min(eff - info.first, info.count));
+  return game.state === 'quiz' && i === game.builderLine ? info.count : 0;
 }
 
 function builderLineHtml(i) {
