@@ -358,7 +358,7 @@ async function startGame() {
   if (player) { player.destroy(); player = null; }
   player = new YT.Player('yt-player', {
     videoId: currentSong.videoId,
-    playerVars: { playsinline: 1, rel: 0, controls: 1 },
+    playerVars: { playsinline: 1, rel: 0, controls: 0, disablekb: 1 },
     events: {
       // iOS blocks autoplay with sound — playback must start from a real tap
       onReady: () => { $('#start-overlay').classList.remove('hidden'); },
@@ -958,6 +958,21 @@ $('#fs-item').addEventListener('click', () => {
 $('#change-video-item').addEventListener('click', () => {
   closeSheet();
   gotoVideoPicker();
+});
+$('#start-over-item').addEventListener('click', () => {
+  if (!game) return;
+  closeSheet();
+  game.builderCount = 0;
+  currentSong.builderCount = 0;
+  saveToLibrary(currentSong);
+  game.score = 0;
+  game.streak = 0;
+  game.bestStreak = 0;
+  updateStats();
+  $('#quiz-area').classList.add('hidden');
+  $('#stop-loop-btn').classList.add('hidden');
+  $('#start-overlay').classList.add('hidden');
+  restartBuilderPass();
 });
 // acting on the quiz closes the sheet so you see the result; sync and span stay open to fiddle
 ['#hint-btn', '#replay-btn', '#skip-btn'].forEach(s => $(s).addEventListener('click', closeSheet));

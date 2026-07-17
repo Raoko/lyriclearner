@@ -152,6 +152,9 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 }
 #player-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; }
 
+/* the video is display-only — all control happens through the app's own buttons */
+#player-shield { position: absolute; inset: 0; z-index: 1; }
+
 #start-overlay {
   position: absolute; inset: 0; z-index: 2;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
