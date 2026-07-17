@@ -303,9 +303,9 @@ async function startGame() {
     ticker: null,
   };
 
-  // quiz every Nth line, never the very first (you haven't heard anything yet)
+  // quiz every Nth line, starting with the very first
   game.lines.forEach((ln, i) => {
-    ln.quiz = i > 0 && i % currentSong.freq === 0;
+    ln.quiz = i % currentSong.freq === 0;
     ln.result = null;
     ln.frac = 0;
     ln.attempts = 0;
@@ -586,8 +586,8 @@ function enterBuilderQuiz(target) {
   $('#hint-btn').classList.add('hidden');
   $('#replay-btn').classList.add('hidden');
   $('#drive-buttons').classList.remove('hidden');
-  $('#drive-miss').textContent = '👁 Show me';
-  $('#drive-got').textContent = '✓ Got it';
+  $('#drive-miss').textContent = '↻ Repeat';
+  $('#drive-got').textContent = 'Next →';
   $('#span-btn').classList.remove('hidden');
   updateSpanBtn();
 
@@ -603,10 +603,17 @@ function builderAnswer(got, skipped = false) {
   if (!game || game.state !== 'quiz') return;
   game.builderGot = got;
   game.builderSkip = skipped;
-  game.builderReveal = !got;               // missed → show the word while the line plays
+  game.builderReveal = !got;               // Repeat → show the word while the line replays
   game.state = 'builderplay';
   $('#quiz-area').classList.add('hidden');
   renderLyrics();
+  if (!got) {
+    // back up one line so the replay has momentum instead of starting cold on the target
+    const seekT = game.builderLine > 0
+      ? lineTime(game.builderLine - 1) - 0.5
+      : lineTime(0) - 3;
+    player.seekTo(Math.max(0, seekT), true);
+  }
   player.playVideo();
 }
 
@@ -625,13 +632,16 @@ function builderLineEnded() {
 
 function restartBuilderPass() {
   const target = builderTarget();
-  const startLine = currentSong.builderSpan === 'song' ? 0 : Math.max(0, target.lineIdx - 2);
+  // always at least one line of run-up before the target so it flows
+  const startLine = currentSong.builderSpan === 'song' ? 0 : Math.max(0, target.lineIdx - 1);
   game.builderLine = -1;
   game.builderReveal = false;
   game.idx = startLine;
   game.state = 'playing';
   renderLyrics();
-  player.seekTo(Math.max(0, lineTime(startLine) - 1.5), true);
+  // if the target IS the first line, give a few seconds of intro as the run-up instead
+  const pre = startLine === target.lineIdx ? 3 : 1;
+  player.seekTo(Math.max(0, lineTime(startLine) - pre), true);
   player.playVideo();
 }
 
@@ -658,7 +668,7 @@ $('#span-btn').addEventListener('click', () => {
 
 function updateSpanBtn() {
   $('#span-btn').textContent = currentSong.builderSpan === 'song'
-    ? '↩ Restart: whole song' : '↩ Restart: 2 lines back';
+    ? '↩ Restart: whole song' : '↩ Restart: 1 line back';
 }
 
 /* ---------- quiz ---------- */
