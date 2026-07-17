@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LyricLearner">
+  <title>LyricLearner</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+</head>
+<body>
+
+  <!-- ============ HOME ============ -->
+  <section id="screen-home" class="screen active">
+    <header class="hero">
+      <h1>🎤 LyricLearner</h1>
+      <p class="tagline">The song plays. It pauses. You sing the next line.</p>
+    </header>
+
+    <form id="search-form" class="search-box">
+      <input id="search-input" type="search" placeholder="Search any song… e.g. Bohemian Rhapsody Queen" autocomplete="off">
+      <button type="submit">Search</button>
+    </form>
+    <div id="search-status" class="status"></div>
+    <div id="search-results" class="result-list"></div>
+
+    <div id="starter-section">
+      <h2>🐰 Bad Bunny — Top 10 starter pack</h2>
+      <div id="starter-list" class="result-list"></div>
+    </div>
+
+    <div id="library-section" class="hidden">
+      <h2>Your songs</h2>
+      <div id="library-list" class="result-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ SETUP ============ -->
+  <section id="screen-setup" class="screen">
+    <button class="back-btn" data-goto="home">← Back</button>
+    <h2 id="setup-title">Song Title</h2>
+    <p id="setup-artist" class="muted"></p>
+
+    <div class="setup-block">
+      <label for="yt-url">Paste the YouTube link for this song</label>
+      <div class="row">
+        <input id="yt-url" type="url" placeholder="https://www.youtube.com/watch?v=…">
+        <a id="yt-search-link" class="btn-secondary" target="_blank" rel="noopener">Find it ↗</a>
+      </div>
+      <p class="hint">Tip: lyric videos or audio-only uploads usually sync better than official music videos (no long intros).</p>
+    </div>
+
+    <div class="setup-block">
+      <label>Difficulty</label>
+      <div class="seg" id="mode-seg">
+        <button data-mode="choice" class="seg-btn active">Easy<span>pick the word</span></button>
+        <button data-mode="blanks" class="seg-btn">Medium<span>type the blanks</span></button>
+        <button data-mode="full" class="seg-btn">Hard<span>type the whole line</span></button>
+        <button data-mode="drive" class="seg-btn">🚗 Drive<span>no typing, self-check</span></button>
+      </div>
+    </div>
+
+    <div class="setup-block">
+      <label>Quiz how often?</label>
+      <div class="seg" id="freq-seg">
+        <button data-freq="1" class="seg-btn active">Every line</button>
+        <button data-freq="2" class="seg-btn">Every 2nd</button>
+        <button data-freq="3" class="seg-btn">Every 3rd</button>
+      </div>
+    </div>
+
+    <button id="start-btn" class="btn-primary" disabled>Start ▶</button>
+    <div id="setup-status" class="status"></div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="screen-game" class="screen">
+    <div class="game-top">
+      <button class="back-btn" data-goto="home">✕ Quit</button>
+      <div class="game-stats">
+        <span id="stat-score">0 pts</span>
+        <span id="stat-streak">🔥 0</span>
+        <span id="stat-progress">0/0</span>
+      </div>
+    </div>
+
+    <div id="player-wrap">
+      <div id="yt-player"></div>
+      <button id="start-overlay" class="hidden"><span class="play-circle">▶</span>Tap to start</button>
+    </div>
+
+    <div class="sync-bar">
+      <span class="hint">Lyrics out of sync?</span>
+      <button id="sync-earlier" class="chip">−0.25s</button>
+      <span id="sync-value">0.0s</span>
+      <button id="sync-later" class="chip">+0.25s</button>
+    </div>
+
+    <div id="lyrics-panel"></div>
+
+    <div id="quiz-area" class="hidden">
+      <div id="quiz-prompt" class="quiz-prompt"></div>
+      <div id="choice-buttons" class="choice-grid hidden"></div>
+      <div id="drive-buttons" class="drive-grid hidden">
+        <button id="drive-miss" class="drive-btn miss">↻ Missed it</button>
+        <button id="drive-got" class="drive-btn got">✓ Got it</button>
+      </div>
+      <form id="type-form" class="hidden">
+        <input id="type-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+               placeholder="Type the next line…">
+        <button type="submit">Check</button>
+      </form>
+      <div class="quiz-actions">
+        <button id="replay-btn" class="chip">↻ Hear the last bit again</button>
+        <button id="skip-btn" class="chip">Skip →</button>
+      </div>
+    </div>
+
+    <div id="feedback-area" class="hidden">
+      <div id="feedback-line"></div>
+      <button id="continue-btn" class="btn-primary">Continue ▶</button>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section id="screen-results" class="screen">
+    <div class="results-card">
+      <h2 id="results-emoji">🎉</h2>
+      <h2 id="results-title">Nice work!</h2>
+      <div class="results-stats">
+        <div><b id="res-accuracy">0%</b><span>accuracy</span></div>
+        <div><b id="res-score">0</b><span>points</span></div>
+        <div><b id="res-streak">0</b><span>best streak</span></div>
+      </div>
+      <button id="again-btn" class="btn-primary">Practice again ↻</button>
+      <button class="btn-secondary back-btn" data-goto="home">Choose another song</button>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+# 🎤 LyricLearner
+
+Learn the lyrics of any real song. The actual song plays (YouTube), pauses right before
+each line, and waits for you to guess the next phrase.
+
+## Play it
+
+- **Online:** https://raoko.github.io/lyriclearner/
+- **Locally:** `node server.js` → http://localhost:3000 (the console also prints a
+  LAN address for your phone on the same Wi-Fi)
+
+The site is fully static (`docs/` folder) — lyrics come straight from the free
+[LRCLIB](https://lrclib.net) API in the browser, and the audio is the real YouTube video.
+
+## How to play
+
+1. Pick a song from the **🐰 Bad Bunny Top 10 starter pack** (lyrics + video pre-wired),
+   or **search any song** and paste its YouTube link ("Find it ↗" opens a YouTube search).
+2. Pick a difficulty:
+   - **Easy** — pick the missing word from 4 choices
+   - **Medium** — type the missing words (~40% blanked)
+   - **Hard** — type the entire next line
+   - **🚗 Drive** — hands-free: say the line out loud, tap **✓ Got it** or **↻ Missed it**.
+     A miss rewinds, replays the line with the words shown, then quizzes you again.
+3. The song plays and pauses before each quizzed line. Answer, hear the line, keep going.
+
+If the pauses feel early or late (e.g. the video has an intro), use the **−0.25s / +0.25s**
+sync buttons during the game — the offset is saved per song.
+
+Songs you've played are saved to your library (browser localStorage) with your best
+accuracy, the YouTube video, and the sync offset.
+
+Typo-friendly: one-letter typos on longer words still count, accents are ignored.
+
+## iPhone
+
+Open the site in Safari → Share → **Add to Home Screen** to install it like an app.
+
+⚠️ Don't use Drive mode while actually driving — keep your eyes on the road.
