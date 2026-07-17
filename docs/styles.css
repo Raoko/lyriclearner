@@ -246,7 +246,8 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 .choice-grid button.right { border-color: var(--good); background: var(--good-soft); color: var(--good); }
 .choice-grid button.wrong { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
 
-.drive-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.drive-grid { display: flex; gap: 12px; }
+.drive-grid .drive-btn { flex: 1; }
 .drive-btn {
   padding: 24px 10px; font-size: 1.15rem; font-weight: 700;
   border: 0; border-radius: 16px; cursor: pointer;

@@ -374,7 +374,11 @@ async function startGame() {
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
           if (currentSong.mode === 'builder') {
-            if (game.state === 'builderplay') builderLineEnded();
+            if (game.state === 'linerepeat') {
+              player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.6), true);
+              player.playVideo();
+            }
+            else if (game.state === 'builderplay') builderLineEnded();
             else if (builderTarget()) restartBuilderPass();
             else builderComplete();
           } else if (game.loopStart !== null) { wrapLoop(); player.playVideo(); }
@@ -424,6 +428,15 @@ function tick() {
   if (!game || !player || typeof player.getCurrentTime !== 'function') return;
   const t = player.getCurrentTime();
   if (typeof t !== 'number') return;
+
+  // builder "Loop it": seamlessly cycle the target line, no pauses
+  if (game.state === 'linerepeat') {
+    const end = game.builderLine + 1 < game.lines.length
+      ? lineTime(game.builderLine + 1) - LEAD
+      : lineTime(game.builderLine) + 6;
+    if (t >= end) player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.6), true);
+    return;
+  }
 
   // builder mode: the target line is playing after an answer; when it ends, advance/restart
   if (game.state === 'builderplay') {
@@ -620,8 +633,10 @@ function enterBuilderQuiz(target) {
   $('#hint-btn').classList.add('hidden');
   $('#replay-btn').classList.add('hidden');
   $('#drive-buttons').classList.remove('hidden');
-  $('#drive-miss').textContent = '↻ Repeat';
+  $('#drive-miss').classList.remove('hidden');
+  $('#drive-miss').textContent = '🔁 Loop it';
   $('#drive-got').textContent = 'Next →';
+  $('#skip-btn').classList.remove('hidden');
   $('#span-btn').classList.remove('hidden');
   updateSpanBtn();
 
@@ -637,17 +652,26 @@ function builderAnswer(got, skipped = false) {
   if (!game || game.state !== 'quiz') return;
   game.builderGot = got;
   game.builderSkip = skipped;
-  game.builderReveal = !got;               // Repeat → show the word while the line replays
+  game.builderReveal = false;
   game.state = 'builderplay';
   $('#quiz-area').classList.add('hidden');
   renderLyrics();
-  if (!got) {
-    // back up one line so the replay has momentum instead of starting cold on the target
-    const seekT = game.builderLine > 0
-      ? lineTime(game.builderLine - 1) - 0.5
-      : lineTime(0) - 3;
-    player.seekTo(Math.max(0, seekT), true);
-  }
+  player.playVideo();
+}
+
+// "Loop it": replay just the target line continuously, word revealed, no pauses —
+// practice singing along, then tap Ready to be tested on it again
+function builderStartLineLoop() {
+  if (!game || game.state !== 'quiz') return;
+  game.builderReveal = true;
+  game.state = 'linerepeat';
+  $('#quiz-prompt').textContent = '🔁 Looping this line — sing along until it sticks:';
+  $('#drive-miss').classList.add('hidden');
+  $('#drive-got').textContent = '✓ Ready — test me';
+  $('#skip-btn').classList.add('hidden');
+  $('#span-btn').classList.add('hidden');
+  renderLyrics();
+  player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.6), true);
   player.playVideo();
 }
 
@@ -720,6 +744,7 @@ function enterQuiz(i) {
   $('#replay-btn').classList.remove('hidden');
   $('#hint-btn').classList.remove('hidden');
   $('#span-btn').classList.add('hidden');
+  $('#drive-miss').classList.remove('hidden');
   $('#drive-miss').textContent = '↻ Missed it';
   $('#drive-got').textContent = '✓ Got it';
   renderHintWords(line);
@@ -791,7 +816,13 @@ $('#hint-btn').addEventListener('click', () => {
 });
 
 $('#drive-got').addEventListener('click', () => {
-  if (!game || game.state !== 'quiz') return;
+  if (!game) return;
+  if (currentSong.mode === 'builder' && game.state === 'linerepeat') {
+    // done practicing — hide the word and test the same one again with a run-up
+    $('#quiz-area').classList.add('hidden');
+    return restartBuilderPass();
+  }
+  if (game.state !== 'quiz') return;
   if (currentSong.mode === 'builder') return builderAnswer(true);
   const line = game.lines[game.quizIdx];
   // full credit first try, half credit after replays
@@ -801,7 +832,7 @@ $('#drive-got').addEventListener('click', () => {
 
 $('#drive-miss').addEventListener('click', () => {
   if (!game || game.state !== 'quiz' || !player) return;
-  if (currentSong.mode === 'builder') return builderAnswer(false);
+  if (currentSong.mode === 'builder') return builderStartLineLoop();
   const line = game.lines[game.quizIdx];
   line.attempts = (line.attempts || 0) + 1;
   game.streak = 0;
