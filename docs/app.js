@@ -169,11 +169,34 @@ function renderStarterPack() {
 
 /* ============================== setup =============================== */
 
+// one global practice mode picked on the home screen: drive or builder
+let globalMode = localStorage.getItem('lyriclearner.mode') || 'drive';
+if (!['drive', 'builder'].includes(globalMode)) globalMode = 'drive';
+
+function renderModeSwitch() {
+  document.querySelectorAll('#mode-switch .seg-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.gmode === globalMode));
+}
+document.querySelectorAll('#mode-switch .seg-btn').forEach(b =>
+  b.addEventListener('click', () => {
+    globalMode = b.dataset.gmode;
+    localStorage.setItem('lyriclearner.mode', globalMode);
+    renderModeSwitch();
+  }));
+
 function openSetup(song) {
-  currentSong = { mode: 'choice', freq: 1, ...song };
-  // typing modes were removed; migrate songs saved with one
-  if (!['choice', 'drive', 'builder'].includes(currentSong.mode)) currentSong.mode = 'choice';
+  currentSong = { freq: 1, ...song };
+  currentSong.mode = globalMode;
+  currentSong.freq = 1;
   if (!currentSong.builderSpan) currentSong.builderSpan = 'lines';
+
+  // video already known (starter pack / library) — skip setup, straight into the game
+  if (currentSong.videoId) {
+    saveToLibrary(currentSong);
+    startGame();
+    return;
+  }
+
   $('#setup-title').textContent = song.trackName;
   $('#setup-artist').textContent = song.artistName;
   $('#yt-url').value = song.videoId ? 'https://www.youtube.com/watch?v=' + song.videoId : '';
@@ -959,3 +982,4 @@ function escapeHtml(s) {
 
 renderLibrary();
 renderStarterPack();
+renderModeSwitch();

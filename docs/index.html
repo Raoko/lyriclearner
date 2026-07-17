@@ -29,6 +29,11 @@
     <div id="search-status" class="status"></div>
     <div id="search-results" class="result-list"></div>
 
+    <div class="seg" id="mode-switch">
+      <button data-gmode="drive" class="seg-btn active">🚗 Drive<span>hands-free, self-check</span></button>
+      <button data-gmode="builder" class="seg-btn">🧠 Builder<span>one word at a time</span></button>
+    </div>
+
     <div id="starter-section">
       <h2>🐰 Bad Bunny — Top 10 starter pack</h2>
       <div id="starter-list" class="result-list"></div>
@@ -55,7 +60,7 @@
       <p class="hint">Tip: lyric videos or audio-only uploads usually sync better than official music videos (no long intros).</p>
     </div>
 
-    <div class="setup-block">
+    <div class="setup-block hidden">
       <label>Difficulty</label>
       <div class="seg" id="mode-seg">
         <button data-mode="choice" class="seg-btn active">Quiz<span>pick the missing word</span></button>
@@ -64,7 +69,7 @@
       </div>
     </div>
 
-    <div class="setup-block">
+    <div class="setup-block hidden">
       <label>Quiz how often?</label>
       <div class="seg" id="freq-seg">
         <button data-freq="1" class="seg-btn active">Every line</button>
