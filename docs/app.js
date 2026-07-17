@@ -364,9 +364,19 @@ async function startGame() {
   game.ticker = setInterval(tick, TICK_MS);
 }
 
+// brief non-blocking "get ready" flash over the video at song start
+function showGraceNote() {
+  const g = $('#grace-note');
+  g.classList.remove('hidden');
+  g.style.opacity = '1';
+  setTimeout(() => { g.style.opacity = '0'; }, 1500);
+  setTimeout(() => { g.classList.add('hidden'); }, 2200);
+}
+
 $('#start-overlay').addEventListener('click', () => {
   if (!game || !player) return;
   $('#start-overlay').classList.add('hidden');
+  showGraceNote();
   if (currentSong.mode === 'builder') {
     if (builderTarget()) restartBuilderPass();
     else builderComplete();               // song already fully built
