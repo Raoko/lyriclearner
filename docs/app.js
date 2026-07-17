@@ -28,9 +28,11 @@ try { prefs = { ...prefs, ...(JSON.parse(localStorage.getItem(PREFS_KEY)) || {})
 function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
 
 function renderPrefs() {
+  const n = prefs.skipLines, unit = n === 1 ? 'line' : 'lines';
   $('#loopback-value').textContent = prefs.loopBack + (prefs.loopBack === 1 ? ' line' : ' lines');
-  $('#skipn-value').textContent = prefs.skipLines + (prefs.skipLines === 1 ? ' line' : ' lines');
-  $('#skip-btn').textContent = prefs.skipLines === 1 ? 'Skip 1 line →' : `Skip ${prefs.skipLines} lines →`;
+  $('#skipn-value').textContent = `${n} ${unit}`;
+  $('#skip-btn').textContent = `Skip ${n} ${unit} →`;
+  $('#back-line-item').textContent = `↶ Back ${n} ${unit}`;
 }
 
 $('#loopback-minus').addEventListener('click', () => { prefs.loopBack = Math.max(0, prefs.loopBack - 1); savePrefs(); renderPrefs(); });
@@ -992,7 +994,7 @@ $('#back-line-item').addEventListener('click', () => {
   if (!game) return;
   closeSheet();
   if (game.builderCount > 0) {
-    game.builderCount--;
+    game.builderCount = Math.max(0, game.builderCount - prefs.skipLines);  // mirrors the skip amount
     currentSong.builderCount = game.builderCount;
     saveToLibrary(currentSong);
     updateStats();
