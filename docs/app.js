@@ -291,6 +291,7 @@ async function startGame() {
     loopSel: null,             // first line tapped while picking a loop section
     loopStart: null,           // active A-B loop range (line indices)
     loopEnd: null,
+    loopRepeat: false,         // true = just replay the section (no quizzing, 1s pause between passes)
     score: 0,
     streak: 0,
     bestStreak: 0,
@@ -304,6 +305,7 @@ async function startGame() {
     ln.result = null;
     ln.frac = 0;
     ln.attempts = 0;
+    ln.hints = 0;
   });
   game.total = game.lines.filter(l => l.quiz).length;
 
@@ -383,9 +385,10 @@ function tick() {
   }
 
   // advance past lines whose moment has passed
+  const repeatLoop = game.loopRepeat && game.loopStart !== null;
   while (game.idx < game.lines.length && t >= lineTime(game.idx) - LEAD) {
     const line = game.lines[game.idx];
-    if (line.quiz && line.result === null) {
+    if (line.quiz && line.result === null && !repeatLoop) {
       player.pauseVideo();
       enterQuiz(game.idx);
       return;
@@ -403,12 +406,25 @@ function wrapLoop() {
   for (let i = game.loopStart; i <= game.loopEnd; i++) {
     game.lines[i].result = null;
     game.lines[i].attempts = 0;
+    game.lines[i].hints = 0;
   }
   game.idx = game.loopStart;
   game.quizIdx = null;
   game.revealIdx = null;
   renderLyrics();
-  player.seekTo(Math.max(0, lineTime(game.loopStart) - 2), true);
+  if (game.loopRepeat) {
+    // repeat mode: a one-second breather between passes
+    player.pauseVideo();
+    game.state = 'looppause';
+    setTimeout(() => {
+      if (!game || game.state !== 'looppause') return;
+      player.seekTo(Math.max(0, lineTime(game.loopStart) - 2), true);
+      game.state = 'playing';
+      player.playVideo();
+    }, 1000);
+  } else {
+    player.seekTo(Math.max(0, lineTime(game.loopStart) - 2), true);
+  }
 }
 
 function onLineTap(i) {
@@ -442,12 +458,29 @@ $('#loop-clear').addEventListener('click', () => {
   game.loopSel = null;
   game.loopStart = null;
   game.loopEnd = null;
+  if (game.state === 'looppause') { game.state = 'playing'; player.playVideo(); }
+  updateLoopBar();
+  renderLyrics();
+});
+
+$('#loop-mode-btn').addEventListener('click', () => {
+  if (!game || game.loopStart === null) return;
+  game.loopRepeat = !game.loopRepeat;
+  if (game.loopRepeat && game.state === 'quiz') {
+    // a quiz is open inside the loop — dismiss it and keep the music rolling
+    $('#quiz-area').classList.add('hidden');
+    game.quizIdx = null;
+    game.state = 'playing';
+    player.playVideo();
+  }
   updateLoopBar();
   renderLyrics();
 });
 
 function updateLoopBar() {
-  const hint = $('#loop-hint'), clear = $('#loop-clear');
+  const hint = $('#loop-hint'), clear = $('#loop-clear'), modeBtn = $('#loop-mode-btn');
+  modeBtn.classList.toggle('hidden', game.loopStart === null);
+  modeBtn.textContent = game.loopRepeat ? '🔂 Repeat mode' : '🎓 Quiz mode';
   if (game.loopStart !== null) {
     hint.textContent = `🔁 Looping lines ${game.loopStart + 1}–${game.loopEnd + 1}`;
     clear.textContent = '✕ Clear loop';
@@ -476,6 +509,7 @@ function enterQuiz(i) {
   $('#type-form').classList.add('hidden');
   $('#drive-buttons').classList.add('hidden');
   $('#replay-btn').classList.remove('hidden');
+  renderHintWords(line);
   renderLyrics();
 
   const ws = words(line.text);
@@ -557,6 +591,25 @@ $('#type-form').addEventListener('submit', (e) => {
   resolveQuiz(frac, line.text, { ws, blankIdx: line.blankIdx, perWord });
 });
 
+function renderHintWords(line) {
+  const el = $('#hint-words');
+  if (!line.hints) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  const ws = words(line.text);
+  el.classList.remove('hidden');
+  el.textContent = '💡 ' + ws.slice(0, line.hints).map(w => w.raw).join(' ') + (line.hints < ws.length ? ' …' : '');
+}
+
+$('#hint-btn').addEventListener('click', () => {
+  if (!game || game.state !== 'quiz') return;
+  const line = game.lines[game.quizIdx];
+  line.hints = Math.min(line.hints + 1, words(line.text).length);
+  renderHintWords(line);
+});
+
 $('#drive-got').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
   const line = game.lines[game.quizIdx];
@@ -595,6 +648,7 @@ $('#replay-btn').addEventListener('click', () => {
 
 function resolveQuiz(frac, fullText, detail, skipped = false) {
   const line = game.lines[game.quizIdx];
+  if (line.hints) frac = Math.max(0, frac - line.hints / words(fullText).length);  // peeked words aren't yours
   const good = frac >= 0.8;
   line.result = good ? 'good' : (frac > 0 ? 'partial' : 'bad');
   line.frac = frac;   // latest attempt wins, so loop practice updates your result
@@ -666,6 +720,9 @@ function renderLyrics() {
       else div.textContent = line.text;
     } else if (i === game.revealIdx) {
       div.classList.add('current');
+      div.textContent = line.text;
+    } else if (game.loopRepeat && game.loopStart !== null && i >= game.loopStart && i <= game.loopEnd) {
+      div.classList.add('past');   // repeat mode: read along with the whole section
       div.textContent = line.text;
     } else if (i === game.idx && game.state === 'quiz') {
       div.classList.add('current');

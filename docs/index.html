@@ -103,6 +103,7 @@
 
     <div class="loop-bar">
       <span id="loop-hint" class="hint">🔁 Tap a lyric line to loop a section</span>
+      <button id="loop-mode-btn" class="chip hidden">🎓 Quiz mode</button>
       <button id="loop-clear" class="chip hidden">✕ Clear loop</button>
     </div>
     <div id="lyrics-panel"></div>
@@ -119,7 +120,9 @@
                placeholder="Type the next line…">
         <button type="submit">Check</button>
       </form>
+      <div id="hint-words" class="hint-words hidden"></div>
       <div class="quiz-actions">
+        <button id="hint-btn" class="chip">💡 Reveal a word</button>
         <button id="replay-btn" class="chip">↻ Hear the last bit again</button>
         <button id="skip-btn" class="chip">Skip →</button>
       </div>

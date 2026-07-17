@@ -26,6 +26,10 @@ The site is fully static (`docs/` folder) — lyrics come straight from the free
 4. **Loop a section:** tap the first and last line of a section in the lyrics panel and
    the app repeats just that part (chorus, fast verse…), re-quizzing you every pass.
    Your latest attempt at each line is what counts. Tap ✕ to clear the loop.
+   Toggle the loop to **🔂 Repeat mode** to skip the quizzing entirely — the section just
+   replays with the words shown and a 1-second breather between passes.
+5. **Stuck on a line?** Tap **💡 Reveal a word** to uncover it one word at a time instead
+   of giving up the whole line (each peeked word costs a bit of credit).
 
 If the pauses feel early or late (e.g. the video has an intro), use the **−0.25s / +0.25s**
 sync buttons during the game — the offset is saved per song.
