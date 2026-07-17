@@ -745,8 +745,8 @@ function enterQuiz(i) {
   $('#hint-btn').classList.remove('hidden');
   $('#span-btn').classList.add('hidden');
   $('#drive-miss').classList.remove('hidden');
-  $('#drive-miss').textContent = '↻ Missed it';
-  $('#drive-got').textContent = '✓ Got it';
+  $('#drive-miss').textContent = '↻ Repeat';
+  $('#drive-got').textContent = 'Next →';
   renderHintWords(line);
   renderLyrics();
 
@@ -755,8 +755,8 @@ function enterQuiz(i) {
   if (mode === 'drive') {
     line.attempts = line.attempts || 0;
     $('#quiz-prompt').textContent = line.attempts
-      ? 'One more time — say the line, then check yourself:'
-      : 'Say the next line out loud, then check yourself:';
+      ? 'One more time — say the line, then Next when you have it:'
+      : 'Say the next line from memory — Repeat plays it for you:';
     $('#drive-buttons').classList.remove('hidden');
     $('#replay-btn').classList.add('hidden');   // "Missed it" already replays the line
   } else {
