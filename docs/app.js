@@ -841,8 +841,8 @@ $('#drive-got').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
   if (currentSong.mode === 'builder') return builderAnswer(true);
   const line = game.lines[game.quizIdx];
-  // full credit first try, half credit after replays
-  resolveQuiz(line.attempts ? 0.5 : 1, line.text);
+  // Next always counts as got it — repeats are learning, not failure
+  resolveQuiz(1, line.text);
   resumeAfterFeedback();   // no feedback card in drive mode — reveal in the panel and keep rolling
 });
 
