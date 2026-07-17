@@ -904,13 +904,20 @@ function renderLyrics() {
       div.classList.add('current');
       div.textContent = '🎤 …?';
     } else {
+      // upcoming lines: real text behind a heavy blur, Apple Music style
       div.classList.add('future');
-      div.textContent = '· '.repeat(Math.min(line.text.split(' ').length, 12));
+      div.textContent = line.text;
     }
     panel.appendChild(div);
   });
-  const anchor = panel.children[Math.max(0, game.idx - 2)];
-  if (anchor) panel.scrollTop = anchor.offsetTop - panel.offsetTop;
+  // keep the active line vertically centered, gliding smoothly like a lyrics app
+  const cur = panel.children[Math.min(game.idx, panel.children.length - 1)];
+  if (cur) {
+    panel.scrollTo({
+      top: cur.offsetTop - panel.clientHeight / 2 + cur.offsetHeight / 2,
+      behavior: 'smooth',
+    });
+  }
 }
 
 function updateStats() {
