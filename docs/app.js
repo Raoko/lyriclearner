@@ -373,6 +373,7 @@ async function startGame() {
       onReady: () => { $('#start-overlay').classList.remove('hidden'); },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
+          if (isAdPlaying()) return;   // an ad finishing is not the song finishing
           if (currentSong.mode === 'builder') {
             if (game.state === 'linerepeat') {
               player.seekTo(Math.max(0, lineTime(game.builderLine) - 0.5), true);
@@ -425,8 +426,19 @@ function lineTime(i) {
   return game.lines[i].t + currentSong.offset;
 }
 
+// The iframe API has no ad events, but while an ad plays the player reports the
+// ad's own short duration — if the "video" is far too short to be our song, it's an ad.
+function isAdPlaying() {
+  if (typeof player.getDuration !== 'function') return false;
+  const dur = player.getDuration();
+  if (!dur) return true;   // metadata not loaded yet — don't run game logic on nothing
+  const lastT = game.lines[game.lines.length - 1].t;
+  return dur < Math.min(120, lastT * 0.5);
+}
+
 function tick() {
   if (!game || !player || typeof player.getCurrentTime !== 'function') return;
+  if (isAdPlaying()) return;   // let the ad run; the game resumes when the song starts
   const t = player.getCurrentTime();
   if (typeof t !== 'number') return;
 
