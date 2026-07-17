@@ -615,6 +615,8 @@ function builderHiddenInLine(i) {
   if (!info) return 0;
   // while looping a line for practice, show every word — the loop is for absorbing it
   if (game.state === 'linerepeat' && i === game.repLine) return 0;
+  // while being tested, the whole line is blank — recall it all from memory
+  if (game.state === 'quiz' && i === game.builderLine) return info.count;
   // learned words stay hidden; the target word is hidden too unless "Show me" revealed it
   const eff = (game.builderReveal && game.builderLine === i) ? game.builderCount : game.builderCount + 1;
   return Math.max(0, Math.min(eff - info.first, info.count));
@@ -647,10 +649,9 @@ function enterBuilderQuiz(target) {
   updateSpanBtn();
 
   const ws = words(game.lines[target.lineIdx].text);
-  const hid = builderHiddenInLine(target.lineIdx);
   $('#quiz-prompt').innerHTML =
     `Word ${game.builderCount + 1}/${game.builderWords.length}: ` +
-    promptWithBlanks(ws, [...Array(hid).keys()]);
+    promptWithBlanks(ws, ws.map((_, j) => j));
   renderLyrics();
 }
 
