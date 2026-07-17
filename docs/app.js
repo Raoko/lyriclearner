@@ -410,6 +410,7 @@ $('#start-overlay').addEventListener('click', () => {
 });
 
 function stopGame() {
+  setLyricsFull(false);
   if (game && game.ticker) clearInterval(game.ticker);
   if (player) { try { player.destroy(); } catch {} player = null; }
   game = null;
@@ -873,6 +874,19 @@ function resumeAfterFeedback() {
   renderLyrics();
   player.playVideo();
 }
+
+/* ---------- full-screen lyrics ---------- */
+
+function setLyricsFull(on) {
+  $('#screen-game').classList.toggle('lyrics-full', on);
+  $('#lyrics-close').classList.toggle('hidden', !on);
+}
+$('#lyrics-expand').addEventListener('click', () => setLyricsFull(true));
+$('#lyrics-close').addEventListener('click', () => setLyricsFull(false));
+// tapping the empty space of the lyrics (not a line) also expands
+$('#lyrics-panel').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) setLyricsFull(true);
+});
 
 /* ---------- rendering ---------- */
 

@@ -222,7 +222,7 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 .lyr-line.in-loop { border-left-color: var(--accent); background: var(--accent-soft); border-radius: 0 10px 10px 0; }
 .lyr-line.past { color: var(--muted); }
 .lyr-line.current { color: var(--text); }
-.lyr-line.future { filter: blur(7px); opacity: 0.5; }
+.lyr-line.future { filter: blur(11px); opacity: 0.4; }
 .lyr-line .w-good { color: var(--good); }
 .lyr-line .w-bad { color: var(--bad); text-decoration: underline; }
 .lyr-line .w-blank {
@@ -274,6 +274,28 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 #feedback-line .w-bad { color: var(--bad); text-decoration: line-through; }
 #feedback-line .verdict { display: block; font-size: 0.85rem; margin-top: 8px; color: var(--muted); }
 #feedback-area .btn-primary { margin-top: 14px; }
+
+/* ---------- Full-screen lyrics ---------- */
+#screen-game.lyrics-full #lyrics-panel {
+  position: fixed; inset: 0; z-index: 50;
+  max-height: none; margin: 0;
+  padding: calc(env(safe-area-inset-top) + 76px) 26px calc(env(safe-area-inset-bottom) + 190px);
+  background: rgba(244, 241, 251, 0.9);
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  font-size: 1.6rem; line-height: 1.4;
+}
+#screen-game.lyrics-full #quiz-area,
+#screen-game.lyrics-full #feedback-area {
+  position: fixed; left: 14px; right: 14px;
+  bottom: calc(env(safe-area-inset-bottom) + 14px); z-index: 51;
+  margin: 0; padding: 14px;
+  background: var(--card); border-radius: 20px; box-shadow: var(--shadow);
+  max-width: 692px; margin-inline: auto;
+}
+#lyrics-close {
+  position: fixed; top: calc(env(safe-area-inset-top) + 14px); right: 16px; z-index: 52;
+  font-size: 1rem; padding: 10px 16px;
+}
 
 /* ---------- Results ---------- */
 .results-card { text-align: center; padding-top: 60px; }
