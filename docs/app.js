@@ -19,6 +19,25 @@ const STARTER_PACK = [
   { trackName: 'MÍA', artistName: 'Bad Bunny ft. Drake', lrclibId: 7448627, videoId: '635ynSfnTN0' },
 ];
 
+/* ============================== prefs =============================== */
+
+const PREFS_KEY = 'lyriclearner.prefs.v1';
+let prefs = { loopBack: 0, skipLines: 1 };   // loop rewind depth / skip jump, 5 max each
+try { prefs = { ...prefs, ...(JSON.parse(localStorage.getItem(PREFS_KEY)) || {}) }; } catch {}
+
+function savePrefs() { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
+
+function renderPrefs() {
+  $('#loopback-value').textContent = prefs.loopBack + (prefs.loopBack === 1 ? ' line' : ' lines');
+  $('#skipn-value').textContent = prefs.skipLines + (prefs.skipLines === 1 ? ' line' : ' lines');
+  $('#skip-btn').textContent = prefs.skipLines === 1 ? 'Skip 1 line →' : `Skip ${prefs.skipLines} lines →`;
+}
+
+$('#loopback-minus').addEventListener('click', () => { prefs.loopBack = Math.max(0, prefs.loopBack - 1); savePrefs(); renderPrefs(); });
+$('#loopback-plus').addEventListener('click', () => { prefs.loopBack = Math.min(5, prefs.loopBack + 1); savePrefs(); renderPrefs(); });
+$('#skipn-minus').addEventListener('click', () => { prefs.skipLines = Math.max(1, prefs.skipLines - 1); savePrefs(); renderPrefs(); });
+$('#skipn-plus').addEventListener('click', () => { prefs.skipLines = Math.min(5, prefs.skipLines + 1); savePrefs(); renderPrefs(); });
+
 /* ============================== state ============================== */
 
 let currentSong = null;   // { key, trackName, artistName, syncedLyrics, videoId, offset, mode, freq }
@@ -377,7 +396,7 @@ async function startGame() {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
           if (isAdPlaying()) return;   // an ad finishing is not the song finishing
           if (game.state === 'linerepeat') {
-            gameSeek(lineTime(game.repLine) - 0.5);
+            gameSeek(lineTime(game.repFrom) - 0.5);
             player.playVideo();
           } else if (currentSong.mode === 'builder') {
             if (game.state === 'builderplay') builderLineEnded();
@@ -473,12 +492,12 @@ function tick() {
     game.expectSeek = null;
   }
 
-  // "Loop it": seamlessly cycle one line, any mode, no pauses
+  // "Loop it": seamlessly cycle the line (plus its rewind run-up), no pauses
   if (game.state === 'linerepeat') {
     const end = game.repLine + 1 < game.lines.length
       ? lineTime(game.repLine + 1) - LEAD
       : lineTime(game.repLine) + 6;
-    if (t >= end) gameSeek(lineTime(game.repLine) - 0.5);
+    if (t >= end) gameSeek(lineTime(game.repFrom) - 0.5);
     return;
   }
 
@@ -678,12 +697,13 @@ function startLineLoop() {
   if (!game || game.state !== 'quiz') return;
   const builder = currentSong.mode === 'builder';
   game.repLine = builder ? game.builderLine : game.quizIdx;
+  game.repFrom = Math.max(0, game.repLine - prefs.loopBack);   // rewind depth from settings
   game.revealIdx = game.repLine;
   game.state = 'linerepeat';
   $('#quiz-area').classList.add('hidden');
   $('#stop-loop-btn').classList.remove('hidden');
   renderLyrics();
-  gameSeek(lineTime(game.repLine) - 0.5);
+  gameSeek(lineTime(game.repFrom) - 0.5);
   player.playVideo();
 }
 
@@ -864,7 +884,16 @@ $('#drive-miss').addEventListener('click', () => {
 
 $('#skip-btn').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
-  if (currentSong.mode === 'builder') return builderAnswer(true, true);  // advance, no points
+  if (currentSong.mode === 'builder') {
+    // jump forward by the skip amount from settings, no points, no playthrough
+    game.builderCount = Math.min(game.builderCount + prefs.skipLines, game.lines.length);
+    currentSong.builderCount = game.builderCount;
+    saveToLibrary(currentSong);
+    updateStats();
+    $('#quiz-area').classList.add('hidden');
+    if (builderTarget() === null) return builderComplete();
+    return restartBuilderPass();
+  }
   resolveQuiz(0, game.lines[game.quizIdx].text, true);
 });
 
@@ -1103,3 +1132,4 @@ function escapeHtml(s) {
 
 renderLibrary();
 renderStarterPack();
+renderPrefs();

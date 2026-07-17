@@ -10,7 +10,7 @@
   <title>LyricLearner</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="styles.css?v=20260717k">
+  <link rel="stylesheet" href="styles.css?v=20260717l">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
 </head>
 <body>
@@ -128,6 +128,18 @@
       <button id="span-btn" class="sheet-item">↩ Restart: 1 line back</button>
       <button id="skip-btn" class="sheet-item">Skip this one →</button>
       <div class="sheet-item sync-row">
+        <span>Loop rewind</span>
+        <button id="loopback-minus" class="chip">−</button>
+        <span id="loopback-value">0 lines</span>
+        <button id="loopback-plus" class="chip">+</button>
+      </div>
+      <div class="sheet-item sync-row">
+        <span>Skip amount</span>
+        <button id="skipn-minus" class="chip">−</button>
+        <span id="skipn-value">1 line</span>
+        <button id="skipn-plus" class="chip">+</button>
+      </div>
+      <div class="sheet-item sync-row">
         <span>Lyrics sync</span>
         <button id="sync-earlier" class="chip">−0.25s</button>
         <span id="sync-value">0.0s</span>
@@ -151,6 +163,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=20260717k"></script>
+  <script src="app.js?v=20260717l"></script>
 </body>
 </html>
