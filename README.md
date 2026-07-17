@@ -20,6 +20,10 @@ The site is fully static (`docs/` folder) — lyrics come straight from the free
    - **Quiz** — pick the missing word from 4 choices
    - **🚗 Drive** — hands-free: say the line out loud, tap **✓ Got it** or **↻ Missed it**.
      A miss rewinds, replays the line with the words shown, then quizzes you again.
+   - **🧠 Builder** — memorize cumulatively, one word at a time. Words get hidden in order
+     and stay hidden; the song pauses before your current word so you can pull it from
+     memory (✓ Got it / 👁 Show me), plays the line, then restarts — from 2 lines back or
+     the whole song (↩ toggle). Progress is saved per song, so you can build a song over days.
 
    (Typing modes were removed — not practical mid-song. Voice recognition is planned.)
 3. The song plays and pauses before each quizzed line. Answer, hear the line, keep going.

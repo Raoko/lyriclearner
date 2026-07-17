@@ -172,7 +172,8 @@ function renderStarterPack() {
 function openSetup(song) {
   currentSong = { mode: 'choice', freq: 1, ...song };
   // typing modes were removed; migrate songs saved with one
-  if (!['choice', 'drive'].includes(currentSong.mode)) currentSong.mode = 'choice';
+  if (!['choice', 'drive', 'builder'].includes(currentSong.mode)) currentSong.mode = 'choice';
+  if (!currentSong.builderSpan) currentSong.builderSpan = 'lines';
   $('#setup-title').textContent = song.trackName;
   $('#setup-artist').textContent = song.artistName;
   $('#yt-url').value = song.videoId ? 'https://www.youtube.com/watch?v=' + song.videoId : '';
@@ -312,6 +313,24 @@ async function startGame() {
   });
   game.total = game.lines.filter(l => l.quiz).length;
 
+  if (currentSong.mode === 'builder') {
+    // builder quizzes words cumulatively, not lines
+    game.lines.forEach(ln => { ln.quiz = false; });
+    game.builderWords = [];                 // every word in reading order: { lineIdx }
+    game.builderLineInfo = game.lines.map((ln, i) => {
+      const ws = words(ln.text);
+      const info = { first: game.builderWords.length, count: ws.length };
+      ws.forEach(() => game.builderWords.push({ lineIdx: i }));
+      return info;
+    });
+    game.builderCount = Math.min(currentSong.builderCount || 0, game.builderWords.length);
+    game.builderLine = -1;                  // line of the word being quizzed / replayed
+    game.builderGot = false;
+    game.builderSkip = false;
+    game.builderReveal = false;             // true = show the target word during the replay
+    game.total = game.builderWords.length;
+  }
+
   showScreen('game');
   renderLyrics();
   updateStats();
@@ -331,7 +350,11 @@ async function startGame() {
       onReady: () => { $('#start-overlay').classList.remove('hidden'); },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
-          if (game.loopStart !== null) { wrapLoop(); player.playVideo(); }
+          if (currentSong.mode === 'builder') {
+            if (game.state === 'builderplay') builderLineEnded();
+            else if (builderTarget()) restartBuilderPass();
+            else builderComplete();
+          } else if (game.loopStart !== null) { wrapLoop(); player.playVideo(); }
           else finishGame();
         }
       },
@@ -344,6 +367,11 @@ async function startGame() {
 $('#start-overlay').addEventListener('click', () => {
   if (!game || !player) return;
   $('#start-overlay').classList.add('hidden');
+  if (currentSong.mode === 'builder') {
+    if (builderTarget()) restartBuilderPass();
+    else builderComplete();               // song already fully built
+    return;
+  }
   game.state = 'playing';
   player.playVideo();
 });
@@ -363,6 +391,15 @@ function tick() {
   const t = player.getCurrentTime();
   if (typeof t !== 'number') return;
 
+  // builder mode: the target line is playing after an answer; when it ends, advance/restart
+  if (game.state === 'builderplay') {
+    const end = game.builderLine + 1 < game.lines.length
+      ? lineTime(game.builderLine + 1) - LEAD
+      : lineTime(game.builderLine) + 6;
+    if (t >= end) builderLineEnded();
+    return;
+  }
+
   // drive mode: replaying the missed line with the text shown; when it ends, ask again
   if (game.state === 'drivereplay') {
     const end = game.quizIdx + 1 < game.lines.length
@@ -378,6 +415,16 @@ function tick() {
   }
 
   if (game.state !== 'playing') return;
+
+  // builder mode: pause right before the line holding the word being learned
+  if (currentSong.mode === 'builder') {
+    const target = builderTarget();
+    if (target && t >= lineTime(target.lineIdx) - LEAD) {
+      player.pauseVideo();
+      enterBuilderQuiz(target);
+      return;
+    }
+  }
 
   // active loop: jump back to the section start once its last line has played
   if (game.loopStart !== null) {
@@ -432,6 +479,7 @@ function wrapLoop() {
 
 function onLineTap(i) {
   if (!game || game.state === 'done') return;
+  if (currentSong.mode === 'builder') return;       // no section loops in builder mode
   if (game.loopStart !== null) return;              // loop active — use ✕ Clear loop
   if (game.loopSel === null) {
     game.loopSel = i;                               // first tap: arm the section start
@@ -482,6 +530,12 @@ $('#loop-mode-btn').addEventListener('click', () => {
 
 function updateLoopBar() {
   const hint = $('#loop-hint'), clear = $('#loop-clear'), modeBtn = $('#loop-mode-btn');
+  if (currentSong.mode === 'builder') {
+    hint.textContent = '🧠 Building the song one word at a time — learned words stay hidden';
+    clear.classList.add('hidden');
+    modeBtn.classList.add('hidden');
+    return;
+  }
   modeBtn.classList.toggle('hidden', game.loopStart === null);
   modeBtn.textContent = game.loopRepeat ? '🔂 Repeat mode' : '🎓 Quiz mode';
   if (game.loopStart !== null) {
@@ -498,6 +552,115 @@ function updateLoopBar() {
   }
 }
 
+/* ---------- builder (learn one word at a time) ---------- */
+
+function builderTarget() {
+  return game.builderCount < game.builderWords.length ? game.builderWords[game.builderCount] : null;
+}
+
+// how many leading words of line i are hidden right now
+function builderHiddenInLine(i) {
+  const info = game.builderLineInfo[i];
+  if (!info) return 0;
+  // learned words stay hidden; the target word is hidden too unless "Show me" revealed it
+  const eff = (game.builderReveal && game.builderLine === i) ? game.builderCount : game.builderCount + 1;
+  return Math.max(0, Math.min(eff - info.first, info.count));
+}
+
+function builderLineHtml(i) {
+  const hid = builderHiddenInLine(i);
+  return words(game.lines[i].text).map((w, j) =>
+    j < hid ? `<span class="w-blank">${escapeHtml(w.raw)}</span>` : escapeHtml(w.raw)
+  ).join(' ');
+}
+
+function enterBuilderQuiz(target) {
+  game.state = 'quiz';
+  game.builderLine = target.lineIdx;
+  game.builderReveal = false;
+
+  $('#quiz-area').classList.remove('hidden');
+  $('#feedback-area').classList.add('hidden');
+  $('#choice-buttons').classList.add('hidden');
+  $('#hint-words').classList.add('hidden');
+  $('#hint-btn').classList.add('hidden');
+  $('#replay-btn').classList.add('hidden');
+  $('#drive-buttons').classList.remove('hidden');
+  $('#drive-miss').textContent = '👁 Show me';
+  $('#drive-got').textContent = '✓ Got it';
+  $('#span-btn').classList.remove('hidden');
+  updateSpanBtn();
+
+  const ws = words(game.lines[target.lineIdx].text);
+  const hid = builderHiddenInLine(target.lineIdx);
+  $('#quiz-prompt').innerHTML =
+    `🧠 Word ${game.builderCount + 1} of ${game.builderWords.length} — pull the next word from memory: ` +
+    promptWithBlanks(ws, [...Array(hid).keys()]);
+  renderLyrics();
+}
+
+function builderAnswer(got, skipped = false) {
+  if (!game || game.state !== 'quiz') return;
+  game.builderGot = got;
+  game.builderSkip = skipped;
+  game.builderReveal = !got;               // missed → show the word while the line plays
+  game.state = 'builderplay';
+  $('#quiz-area').classList.add('hidden');
+  renderLyrics();
+  player.playVideo();
+}
+
+function builderLineEnded() {
+  player.pauseVideo();
+  if (game.builderGot) {
+    game.builderCount++;
+    if (!game.builderSkip) game.score += 5;
+    currentSong.builderCount = game.builderCount;
+    saveToLibrary(currentSong);
+    updateStats();
+    if (!builderTarget()) return builderComplete();
+  }
+  restartBuilderPass();
+}
+
+function restartBuilderPass() {
+  const target = builderTarget();
+  const startLine = currentSong.builderSpan === 'song' ? 0 : Math.max(0, target.lineIdx - 2);
+  game.builderLine = -1;
+  game.builderReveal = false;
+  game.idx = startLine;
+  game.state = 'playing';
+  renderLyrics();
+  player.seekTo(Math.max(0, lineTime(startLine) - 1.5), true);
+  player.playVideo();
+}
+
+function builderComplete() {
+  game.state = 'done';
+  clearInterval(game.ticker);
+  try { player.pauseVideo(); } catch {}
+  $('#res-accuracy').textContent = '100%';
+  $('#res-score').textContent = game.score;
+  $('#res-streak').textContent = game.builderWords.length;
+  $('#results-emoji').textContent = '🧠';
+  $('#results-title').textContent = 'Every word memorized!';
+  currentSong.bestScore = 100;
+  currentSong.builderCount = 0;            // fresh start next run
+  saveToLibrary(currentSong);
+  showScreen('results');
+}
+
+$('#span-btn').addEventListener('click', () => {
+  currentSong.builderSpan = currentSong.builderSpan === 'song' ? 'lines' : 'song';
+  saveToLibrary(currentSong);
+  updateSpanBtn();
+});
+
+function updateSpanBtn() {
+  $('#span-btn').textContent = currentSong.builderSpan === 'song'
+    ? '↩ Restart: whole song' : '↩ Restart: 2 lines back';
+}
+
 /* ---------- quiz ---------- */
 
 function enterQuiz(i) {
@@ -511,6 +674,10 @@ function enterQuiz(i) {
   $('#choice-buttons').classList.add('hidden');
   $('#drive-buttons').classList.add('hidden');
   $('#replay-btn').classList.remove('hidden');
+  $('#hint-btn').classList.remove('hidden');
+  $('#span-btn').classList.add('hidden');
+  $('#drive-miss').textContent = '↻ Missed it';
+  $('#drive-got').textContent = '✓ Got it';
   renderHintWords(line);
   renderLyrics();
 
@@ -581,6 +748,7 @@ $('#hint-btn').addEventListener('click', () => {
 
 $('#drive-got').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
+  if (currentSong.mode === 'builder') return builderAnswer(true);
   const line = game.lines[game.quizIdx];
   // full credit first try, half credit after replays
   resolveQuiz(line.attempts ? 0.5 : 1, line.text);
@@ -589,6 +757,7 @@ $('#drive-got').addEventListener('click', () => {
 
 $('#drive-miss').addEventListener('click', () => {
   if (!game || game.state !== 'quiz' || !player) return;
+  if (currentSong.mode === 'builder') return builderAnswer(false);
   const line = game.lines[game.quizIdx];
   line.attempts = (line.attempts || 0) + 1;
   game.streak = 0;
@@ -604,6 +773,7 @@ $('#drive-miss').addEventListener('click', () => {
 
 $('#skip-btn').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
+  if (currentSong.mode === 'builder') return builderAnswer(true, true);  // advance, no points
   resolveQuiz(0, game.lines[game.quizIdx].text, true);
 });
 
@@ -672,7 +842,11 @@ function renderLyrics() {
     if (i === game.loopSel) div.classList.add('loop-sel');
     if (game.loopStart !== null && i >= game.loopStart && i <= game.loopEnd) div.classList.add('in-loop');
     div.addEventListener('click', () => onLineTap(i));
-    if (i < game.idx) {
+    if (currentSong.mode === 'builder' && (i < game.idx || i === game.builderLine)) {
+      // learned words stay blanked; the rest of the line shows
+      div.classList.add(i === game.builderLine ? 'current' : 'past');
+      div.innerHTML = builderLineHtml(i);
+    } else if (i < game.idx) {
       div.classList.add('past');
       if (line.result === 'good') div.innerHTML = `<span class="w-good">✓</span> ${escapeHtml(line.text)}`;
       else if (line.result) div.innerHTML = `<span class="w-bad">✗</span> ${escapeHtml(line.text)}`;
@@ -697,8 +871,13 @@ function renderLyrics() {
 }
 
 function updateStats() {
-  const answered = game.lines.filter(l => l.quiz && l.result !== null).length;
   $('#stat-score').textContent = game.score + ' pts';
+  if (currentSong.mode === 'builder') {
+    $('#stat-streak').textContent = '🧠';
+    $('#stat-progress').textContent = game.builderCount + '/' + game.total + ' words';
+    return;
+  }
+  const answered = game.lines.filter(l => l.quiz && l.result !== null).length;
   $('#stat-streak').textContent = '🔥 ' + game.streak;
   $('#stat-progress').textContent = answered + '/' + game.total;
 }
