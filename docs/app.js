@@ -226,6 +226,7 @@ function validateSetup() {
 $('#start-btn').addEventListener('click', () => {
   const videoId = parseVideoId($('#yt-url').value);
   if (!videoId) return;
+  if (currentSong.videoId !== videoId) currentSong.offset = 0;  // old offset fit the old video
   currentSong.videoId = videoId;
   saveToLibrary(currentSong);
   startGame();
@@ -292,7 +293,8 @@ function ensureYouTubeAPI() {
 
 /* ============================== game ================================ */
 
-const LEAD = 0.2;          // pause this many seconds before the quizzed line starts
+const LEAD = 0.35;         // pause this many seconds before the quizzed line starts
+                           // (pauseVideo has real latency — too small and you hear the first word)
 const TICK_MS = 80;
 
 async function startGame() {
@@ -318,6 +320,8 @@ async function startGame() {
     bestStreak: 0,
     total: 0,
     ticker: null,
+    expectSeek: null,          // seek in flight: ignore stale clock readings until it lands
+    videoError: false,
   };
 
   // quiz every Nth line, starting with the very first
@@ -347,6 +351,7 @@ async function startGame() {
   $('#quiz-area').classList.add('hidden');
   $('#feedback-area').classList.add('hidden');
   $('#start-overlay').classList.add('hidden');
+  $('#start-overlay').innerHTML = '<span class="play-circle">▶</span>Tap to start';
   $('#sync-value').textContent = (currentSong.offset >= 0 ? '+' : '') + currentSong.offset.toFixed(2) + 's';
 
   await ensureYouTubeAPI();
@@ -357,11 +362,22 @@ async function startGame() {
     events: {
       // iOS blocks autoplay with sound — playback must start from a real tap
       onReady: () => { $('#start-overlay').classList.remove('hidden'); },
+      onError: (e) => {
+        // 101/150 = embedding disabled by the uploader, 100 = video removed/private
+        if (!game) return;
+        game.videoError = true;
+        const why = (e.data === 101 || e.data === 150) ? 'This video blocks playback in apps'
+          : e.data === 100 ? 'This video was removed or is private'
+          : 'This video won\'t play';
+        const o = $('#start-overlay');
+        o.innerHTML = `<span class="play-circle">⚠</span>${why} — tap to pick another`;
+        o.classList.remove('hidden');
+      },
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
           if (isAdPlaying()) return;   // an ad finishing is not the song finishing
           if (game.state === 'linerepeat') {
-            player.seekTo(Math.max(0, lineTime(game.repLine) - 0.5), true);
+            gameSeek(lineTime(game.repLine) - 0.5);
             player.playVideo();
           } else if (currentSong.mode === 'builder') {
             if (game.state === 'builderplay') builderLineEnded();
@@ -388,6 +404,7 @@ function showGraceNote() {
 
 $('#start-overlay').addEventListener('click', () => {
   if (!game || !player) return;
+  if (game.videoError) return gotoVideoPicker();
   $('#start-overlay').classList.add('hidden');
   showGraceNote();
   if (currentSong.mode === 'builder') {
@@ -398,6 +415,19 @@ $('#start-overlay').addEventListener('click', () => {
   game.state = 'playing';
   player.playVideo();
 });
+
+// swap the current song's video: back to the link screen, keep lyrics and progress
+function gotoVideoPicker() {
+  stopGame();
+  $('#setup-title').textContent = currentSong.trackName;
+  $('#setup-artist').textContent = currentSong.artistName;
+  $('#yt-url').value = '';
+  $('#yt-search-link').href = 'https://www.youtube.com/results?search_query=' +
+    encodeURIComponent(currentSong.artistName + ' ' + currentSong.trackName + ' lyrics');
+  $('#setup-status').textContent = '';
+  validateSetup();
+  showScreen('setup');
+}
 
 function stopGame() {
   setLyricsFull(false);
@@ -410,6 +440,15 @@ function stopGame() {
 
 function lineTime(i) {
   return game.lines[i].t + currentSong.offset;
+}
+
+// All in-game jumps go through here. YouTube keeps reporting the OLD position for a
+// few hundred ms after seekTo — acting on that stale clock caused wrong pauses,
+// seek storms, and stalled flows. The tick ignores the clock until the seek lands.
+function gameSeek(tTarget) {
+  const clamped = Math.max(0, tTarget);
+  game.expectSeek = { t: clamped, at: Date.now() };
+  player.seekTo(clamped, true);
 }
 
 // The iframe API has no ad events, but while an ad plays the player reports the
@@ -428,12 +467,18 @@ function tick() {
   const t = player.getCurrentTime();
   if (typeof t !== 'number') return;
 
+  // a seek is in flight — don't act on the clock until the player lands near the target
+  if (game.expectSeek) {
+    if (Math.abs(t - game.expectSeek.t) > 1.5 && Date.now() - game.expectSeek.at < 3000) return;
+    game.expectSeek = null;
+  }
+
   // "Loop it": seamlessly cycle one line, any mode, no pauses
   if (game.state === 'linerepeat') {
     const end = game.repLine + 1 < game.lines.length
       ? lineTime(game.repLine + 1) - LEAD
       : lineTime(game.repLine) + 6;
-    if (t >= end) player.seekTo(Math.max(0, lineTime(game.repLine) - 0.5), true);
+    if (t >= end) gameSeek(lineTime(game.repLine) - 0.5);
     return;
   }
 
@@ -501,12 +546,12 @@ function wrapLoop() {
     game.state = 'looppause';
     setTimeout(() => {
       if (!game || game.state !== 'looppause') return;
-      player.seekTo(Math.max(0, lineTime(game.loopStart) - 2), true);
+      gameSeek(lineTime(game.loopStart) - 2);
       game.state = 'playing';
       player.playVideo();
     }, 1000);
   } else {
-    player.seekTo(Math.max(0, lineTime(game.loopStart) - 2), true);
+    gameSeek(lineTime(game.loopStart) - 2);
   }
 }
 
@@ -638,7 +683,7 @@ function startLineLoop() {
   $('#quiz-area').classList.add('hidden');
   $('#stop-loop-btn').classList.remove('hidden');
   renderLyrics();
-  player.seekTo(Math.max(0, lineTime(game.repLine) - 0.5), true);
+  gameSeek(lineTime(game.repLine) - 0.5);
   player.playVideo();
 }
 
@@ -652,8 +697,7 @@ $('#stop-loop-btn').addEventListener('click', () => {
   line.attempts = (line.attempts || 0) + 1;
   game.state = 'playing';
   renderLyrics();
-  const seekT = game.quizIdx > 0 ? lineTime(game.quizIdx - 1) - 0.5 : lineTime(0) - 3;
-  player.seekTo(Math.max(0, seekT), true);
+  gameSeek(game.quizIdx > 0 ? lineTime(game.quizIdx - 1) - 0.5 : lineTime(0) - 3);
   player.playVideo();
 });
 
@@ -688,7 +732,7 @@ function restartBuilderPass() {
   renderLyrics();
   // if the target IS the first line, give a few seconds of intro as the run-up instead
   const pre = startLine === target ? 3 : 1;
-  player.seekTo(Math.max(0, lineTime(startLine) - pre), true);
+  gameSeek(lineTime(startLine) - pre);
   player.playVideo();
 }
 
@@ -826,8 +870,7 @@ $('#skip-btn').addEventListener('click', () => {
 
 $('#replay-btn').addEventListener('click', () => {
   if (!game || game.state !== 'quiz' || !player) return;
-  const pausePoint = lineTime(game.quizIdx) - LEAD;
-  player.seekTo(Math.max(0, pausePoint - 6), true);
+  gameSeek(lineTime(game.quizIdx) - LEAD - 6);
   player.playVideo();
   game.state = 'playing';   // ticker will re-pause at the same quiz line
 });
@@ -911,6 +954,10 @@ $('#sheet-scrim').addEventListener('click', closeSheet);
 $('#fs-item').addEventListener('click', () => {
   setLyricsFull(!$('#screen-game').classList.contains('lyrics-full'));
   closeSheet();
+});
+$('#change-video-item').addEventListener('click', () => {
+  closeSheet();
+  gotoVideoPicker();
 });
 // acting on the quiz closes the sheet so you see the result; sync and span stay open to fiddle
 ['#hint-btn', '#replay-btn', '#skip-btn'].forEach(s => $(s).addEventListener('click', closeSheet));
