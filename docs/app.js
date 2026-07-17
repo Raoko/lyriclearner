@@ -5,17 +5,18 @@ const $ = (sel) => document.querySelector(sel);
 const LS_KEY = 'lyriclearner.songs.v1';
 const LRCLIB = 'https://lrclib.net/api';   // allows CORS, so this works on static hosting too
 
+// lyric-video uploads: no long intros, so they track the LRC timing better than official videos
 const STARTER_PACK = [
-  { trackName: 'Tití Me Preguntó', artistName: 'Bad Bunny', lrclibId: 17906524, videoId: 'Cr8K88UcO0s' },
-  { trackName: 'Me Porto Bonito', artistName: 'Bad Bunny ft. Chencho Corleone', lrclibId: 20453735, videoId: 'saGYMhApaH8' },
-  { trackName: 'Dákiti', artistName: 'Bad Bunny & Jhay Cortez', lrclibId: 576, videoId: 'TmKh7lAwnBI' },
-  { trackName: 'Callaíta', artistName: 'Bad Bunny', lrclibId: 1004116, videoId: 'acEOASYioGY' },
-  { trackName: 'Ojitos Lindos', artistName: 'Bad Bunny ft. Bomba Estéreo', lrclibId: 22269344, videoId: 'wAjHQXrIj9o' },
-  { trackName: 'Efecto', artistName: 'Bad Bunny', lrclibId: 584, videoId: 'Nk8C9FdCdJQ' },
-  { trackName: 'Moscow Mule', artistName: 'Bad Bunny', lrclibId: 20667007, videoId: 'p38WgakuYDo' },
-  { trackName: 'La Canción', artistName: 'J Balvin & Bad Bunny', lrclibId: 6678008, videoId: 'LxOTsiV4tkQ' },
-  { trackName: 'Yonaguni', artistName: 'Bad Bunny', lrclibId: 1596, videoId: 'doLMt10ytHY' },
-  { trackName: 'MÍA', artistName: 'Bad Bunny ft. Drake', lrclibId: 7448627, videoId: 'OSUxrSe5GbI' },
+  { trackName: 'Tití Me Preguntó', artistName: 'Bad Bunny', lrclibId: 17906524, videoId: 'qBUKfQRbzuk' },
+  { trackName: 'Me Porto Bonito', artistName: 'Bad Bunny ft. Chencho Corleone', lrclibId: 20453735, videoId: 'OblNX5rGJJM' },
+  { trackName: 'Dákiti', artistName: 'Bad Bunny & Jhay Cortez', lrclibId: 576, videoId: '30YlLGeUReY' },
+  { trackName: 'Callaíta', artistName: 'Bad Bunny', lrclibId: 1004116, videoId: 'RFE6v8FpfWs' },
+  { trackName: 'Ojitos Lindos', artistName: 'Bad Bunny ft. Bomba Estéreo', lrclibId: 22269344, videoId: 'mJfkCSTNLhY' },
+  { trackName: 'Efecto', artistName: 'Bad Bunny', lrclibId: 584, videoId: 'T71O6XB6qE8' },
+  { trackName: 'Moscow Mule', artistName: 'Bad Bunny', lrclibId: 20667007, videoId: 'vgGM87RcRko' },
+  { trackName: 'La Canción', artistName: 'J Balvin & Bad Bunny', lrclibId: 6678008, videoId: 'W6ctTolhr3Y' },
+  { trackName: 'Yonaguni', artistName: 'Bad Bunny', lrclibId: 1596, videoId: 'fGlarRSIbfM' },
+  { trackName: 'MÍA', artistName: 'Bad Bunny ft. Drake', lrclibId: 7448627, videoId: '635ynSfnTN0' },
 ];
 
 /* ============================== state ============================== */
@@ -143,9 +144,15 @@ function renderStarterPack() {
       const dur = div.querySelector('.dur');
       dur.textContent = '…';
       try {
-        // reuse saved copy (with its sync offset) if they've played it before
+        // reuse saved copy if they've played it before; migrate it when the pack's video changed
         const saved = loadLibrary().find(x => x.key === 'starter-' + s.lrclibId);
-        if (saved) return openSetup(saved);
+        if (saved) {
+          if (saved.videoId !== s.videoId) {
+            saved.videoId = s.videoId;
+            saved.offset = 0;          // old offset was tuned to the old video
+          }
+          return openSetup(saved);
+        }
         const res = await fetch(`${LRCLIB}/get/${s.lrclibId}`);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
