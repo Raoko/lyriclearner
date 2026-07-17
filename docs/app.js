@@ -959,6 +959,20 @@ $('#change-video-item').addEventListener('click', () => {
   closeSheet();
   gotoVideoPicker();
 });
+$('#back-line-item').addEventListener('click', () => {
+  if (!game) return;
+  closeSheet();
+  if (game.builderCount > 0) {
+    game.builderCount--;
+    currentSong.builderCount = game.builderCount;
+    saveToLibrary(currentSong);
+    updateStats();
+  }
+  $('#quiz-area').classList.add('hidden');
+  $('#stop-loop-btn').classList.add('hidden');
+  $('#start-overlay').classList.add('hidden');
+  restartBuilderPass();   // run-up into the previous line's test
+});
 $('#start-over-item').addEventListener('click', () => {
   if (!game) return;
   closeSheet();
