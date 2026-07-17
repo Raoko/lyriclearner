@@ -613,6 +613,8 @@ function builderTarget() {
 function builderHiddenInLine(i) {
   const info = game.builderLineInfo[i];
   if (!info) return 0;
+  // while looping a line for practice, show every word — the loop is for absorbing it
+  if (game.state === 'linerepeat' && i === game.repLine) return 0;
   // learned words stay hidden; the target word is hidden too unless "Show me" revealed it
   const eff = (game.builderReveal && game.builderLine === i) ? game.builderCount : game.builderCount + 1;
   return Math.max(0, Math.min(eff - info.first, info.count));
