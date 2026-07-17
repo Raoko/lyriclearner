@@ -176,24 +176,9 @@ function renderStarterPack() {
 
 /* ============================== setup =============================== */
 
-// one global practice mode picked on the home screen: drive or builder
-let globalMode = localStorage.getItem('lyriclearner.mode') || 'drive';
-if (!['drive', 'builder'].includes(globalMode)) globalMode = 'drive';
-
-function renderModeSwitch() {
-  document.querySelectorAll('#mode-switch .seg-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.gmode === globalMode));
-}
-document.querySelectorAll('#mode-switch .seg-btn').forEach(b =>
-  b.addEventListener('click', () => {
-    globalMode = b.dataset.gmode;
-    localStorage.setItem('lyriclearner.mode', globalMode);
-    renderModeSwitch();
-  }));
-
 function openSetup(song) {
   currentSong = { freq: 1, ...song };
-  currentSong.mode = globalMode;
+  currentSong.mode = 'builder';   // the one mode: line-by-line with loops and saved progress
   currentSong.freq = 1;
   if (!currentSong.builderSpan) currentSong.builderSpan = 'lines';
   // builder progress changed meaning from words to lines — old counts don't translate
@@ -1042,4 +1027,3 @@ function escapeHtml(s) {
 
 renderLibrary();
 renderStarterPack();
-renderModeSwitch();
