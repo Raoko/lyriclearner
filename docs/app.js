@@ -423,6 +423,7 @@ $('#start-overlay').addEventListener('click', () => {
 
 function stopGame() {
   setLyricsFull(false);
+  closeSheet();
   $('#stop-loop-btn').classList.add('hidden');
   if (game && game.ticker) clearInterval(game.ticker);
   if (player) { try { player.destroy(); } catch {} player = null; }
@@ -596,26 +597,24 @@ $('#loop-mode-btn').addEventListener('click', () => {
 });
 
 function updateLoopBar() {
+  // the bar only exists while a loop is being picked or is running — otherwise no clutter
+  const bar = document.querySelector('.loop-bar');
   const hint = $('#loop-hint'), clear = $('#loop-clear'), modeBtn = $('#loop-mode-btn');
-  if (currentSong.mode === 'builder') {
-    hint.textContent = '🧠 Building the song one word at a time — learned words stay hidden';
-    clear.classList.add('hidden');
-    modeBtn.classList.add('hidden');
+  const active = game.loopStart !== null, armed = game.loopSel !== null;
+  if (currentSong.mode === 'builder' || (!active && !armed)) {
+    bar.classList.add('hidden');
     return;
   }
-  modeBtn.classList.toggle('hidden', game.loopStart === null);
+  bar.classList.remove('hidden');
+  modeBtn.classList.toggle('hidden', !active);
   modeBtn.textContent = game.loopRepeat ? '🔂 Repeat mode' : '🎓 Quiz mode';
-  if (game.loopStart !== null) {
+  clear.classList.remove('hidden');
+  if (active) {
     hint.textContent = `🔁 Looping lines ${game.loopStart + 1}–${game.loopEnd + 1}`;
     clear.textContent = '✕ Clear loop';
-    clear.classList.remove('hidden');
-  } else if (game.loopSel !== null) {
+  } else {
     hint.textContent = '🔁 Now tap the last line of the section';
     clear.textContent = '✕ Cancel';
-    clear.classList.remove('hidden');
-  } else {
-    hint.textContent = '🔁 Tap a lyric line to loop a section';
-    clear.classList.add('hidden');
   }
 }
 
@@ -663,7 +662,7 @@ function enterBuilderQuiz(target) {
   const ws = words(game.lines[target.lineIdx].text);
   const hid = builderHiddenInLine(target.lineIdx);
   $('#quiz-prompt').innerHTML =
-    `🧠 Word ${game.builderCount + 1} of ${game.builderWords.length} — pull the next word from memory: ` +
+    `Word ${game.builderCount + 1}/${game.builderWords.length}: ` +
     promptWithBlanks(ws, [...Array(hid).keys()]);
   renderLyrics();
 }
@@ -778,8 +777,8 @@ function enterQuiz(i) {
   if (mode === 'drive') {
     line.attempts = line.attempts || 0;
     $('#quiz-prompt').textContent = line.attempts
-      ? 'One more time — say the line, then Next when you have it:'
-      : 'Say the next line from memory — Repeat plays it for you:';
+      ? 'Try it again:'
+      : 'Say the next line:';
     $('#drive-buttons').classList.remove('hidden');
     $('#replay-btn').classList.add('hidden');   // "Missed it" already replays the line
   } else {
@@ -929,12 +928,36 @@ function setLyricsFull(on) {
   $('#screen-game').classList.toggle('lyrics-full', on);
   $('#lyrics-close').classList.toggle('hidden', !on);
 }
-$('#lyrics-expand').addEventListener('click', () => setLyricsFull(true));
 $('#lyrics-close').addEventListener('click', () => setLyricsFull(false));
 // tapping the empty space of the lyrics (not a line) also expands
 $('#lyrics-panel').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) setLyricsFull(true);
 });
+
+/* ---------- the one ⋯ menu ---------- */
+
+function openSheet() {
+  // quiz-only actions hide when there's no quiz waiting
+  if (!game || game.state !== 'quiz') {
+    ['#hint-btn', '#replay-btn', '#span-btn', '#skip-btn'].forEach(s => $(s).classList.add('hidden'));
+  }
+  $('#fs-item').textContent = $('#screen-game').classList.contains('lyrics-full')
+    ? '⛶ Exit full-screen lyrics' : '⛶ Full-screen lyrics';
+  $('#sheet-scrim').classList.remove('hidden');
+  $('#more-sheet').classList.remove('hidden');
+}
+function closeSheet() {
+  $('#sheet-scrim').classList.add('hidden');
+  $('#more-sheet').classList.add('hidden');
+}
+$('#more-btn').addEventListener('click', openSheet);
+$('#sheet-scrim').addEventListener('click', closeSheet);
+$('#fs-item').addEventListener('click', () => {
+  setLyricsFull(!$('#screen-game').classList.contains('lyrics-full'));
+  closeSheet();
+});
+// acting on the quiz closes the sheet so you see the result; sync and span stay open to fiddle
+['#hint-btn', '#replay-btn', '#skip-btn'].forEach(s => $(s).addEventListener('click', closeSheet));
 
 /* ---------- rendering ---------- */
 
@@ -983,15 +1006,11 @@ function renderLyrics() {
 }
 
 function updateStats() {
-  $('#stat-score').textContent = game.score + ' pts';
-  if (currentSong.mode === 'builder') {
-    $('#stat-streak').textContent = '🧠';
-    $('#stat-progress').textContent = game.builderCount + '/' + game.total + ' words';
-    return;
-  }
-  const answered = game.lines.filter(l => l.quiz && l.result !== null).length;
-  $('#stat-streak').textContent = '🔥 ' + game.streak;
-  $('#stat-progress').textContent = answered + '/' + game.total;
+  // one calm number in the header; score and streak wait for the results screen
+  const label = currentSong.mode === 'builder' && game.builderWords
+    ? `${game.builderCount}/${game.total} words`
+    : `${game.lines.filter(l => l.quiz && l.result !== null).length}/${game.total}`;
+  $('#stat-progress').textContent = label;
 }
 
 /* ---------- sync offset ---------- */

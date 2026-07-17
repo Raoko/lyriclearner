@@ -85,12 +85,9 @@
   <!-- ============ GAME ============ -->
   <section id="screen-game" class="screen">
     <div class="game-top">
-      <button class="back-btn" data-goto="home">✕ Quit</button>
-      <div class="game-stats">
-        <span id="stat-score">0 pts</span>
-        <span id="stat-streak">🔥 0</span>
-        <span id="stat-progress">0/0</span>
-      </div>
+      <button class="back-btn" data-goto="home">✕</button>
+      <span id="stat-progress" class="progress-label">0/0</span>
+      <button id="more-btn" class="chip" title="More options">⋯</button>
     </div>
 
     <div id="player-wrap">
@@ -99,18 +96,10 @@
       <div id="grace-note" class="hidden">🎤 Get ready…</div>
     </div>
 
-    <div class="sync-bar">
-      <span class="hint">Lyrics out of sync?</span>
-      <button id="sync-earlier" class="chip">−0.25s</button>
-      <span id="sync-value">0.0s</span>
-      <button id="sync-later" class="chip">+0.25s</button>
-    </div>
-
-    <div class="loop-bar">
-      <span id="loop-hint" class="hint">🔁 Tap a lyric line to loop a section</span>
+    <div class="loop-bar hidden">
+      <span id="loop-hint" class="hint"></span>
       <button id="loop-mode-btn" class="chip hidden">🎓 Quiz mode</button>
       <button id="loop-clear" class="chip hidden">✕ Clear loop</button>
-      <button id="lyrics-expand" class="chip" title="Full-screen lyrics">⛶</button>
     </div>
     <div id="lyrics-panel"></div>
     <button id="lyrics-close" class="chip hidden">✕</button>
@@ -124,17 +113,27 @@
         <button id="drive-got" class="drive-btn got">✓ Got it</button>
       </div>
       <div id="hint-words" class="hint-words hidden"></div>
-      <div class="quiz-actions">
-        <button id="hint-btn" class="chip">💡 Reveal a word</button>
-        <button id="replay-btn" class="chip">↻ Hear the last bit again</button>
-        <button id="span-btn" class="chip hidden">↩ Restart: 1 line back</button>
-        <button id="skip-btn" class="chip">Skip →</button>
-      </div>
     </div>
 
     <div id="feedback-area" class="hidden">
       <div id="feedback-line"></div>
       <button id="continue-btn" class="btn-primary">Continue ▶</button>
+    </div>
+
+    <!-- everything occasional lives in one bottom sheet -->
+    <div id="sheet-scrim" class="hidden"></div>
+    <div id="more-sheet" class="hidden">
+      <button id="fs-item" class="sheet-item">⛶ Full-screen lyrics</button>
+      <button id="hint-btn" class="sheet-item">💡 Reveal a word</button>
+      <button id="replay-btn" class="sheet-item">↻ Hear the last bit again</button>
+      <button id="span-btn" class="sheet-item">↩ Restart: 1 line back</button>
+      <button id="skip-btn" class="sheet-item">Skip this one →</button>
+      <div class="sheet-item sync-row">
+        <span>Lyrics sync</span>
+        <button id="sync-earlier" class="chip">−0.25s</button>
+        <span id="sync-value">0.0s</span>
+        <button id="sync-later" class="chip">+0.25s</button>
+      </div>
     </div>
   </section>
 

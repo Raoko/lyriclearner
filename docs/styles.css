@@ -143,9 +143,9 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 
 /* ---------- Game ---------- */
 .game-top { display: flex; justify-content: space-between; align-items: center; }
-.game-top .back-btn { margin: 0; }
-.game-stats { display: flex; gap: 14px; font-size: 0.9rem; color: var(--muted); }
-.game-stats #stat-score { color: var(--accent-hi); font-weight: 700; }
+.game-top .back-btn { margin: 0; font-size: 1.1rem; padding: 8px 12px; }
+.progress-label { color: var(--muted); font-size: 0.95rem; font-weight: 600; }
+#more-btn { font-size: 1.2rem; line-height: 1; padding: 8px 16px; }
 
 #player-wrap {
   position: relative; width: 100%; aspect-ratio: 16 / 9;
@@ -178,11 +178,6 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
   pointer-events: none; opacity: 1; transition: opacity 0.6s;
 }
 
-.sync-bar {
-  display: flex; align-items: center; gap: 10px; justify-content: flex-end;
-  margin-top: 10px; font-size: 0.82rem;
-}
-.sync-bar .hint { margin: 0; }
 #sync-value { color: var(--text); min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
 
 .chip {
@@ -258,7 +253,29 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 .drive-btn.miss { background: var(--bad-soft); color: var(--bad); }
 .drive-btn:active { transform: scale(0.97); }
 
-.quiz-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: center; flex-wrap: wrap; }
+/* ---------- Bottom sheet (the one ⋯ menu) ---------- */
+#sheet-scrim {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(43, 38, 64, 0.35);
+}
+#more-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 71;
+  max-width: 720px; margin: 0 auto;
+  background: var(--card); border-radius: 22px 22px 0 0;
+  padding: 18px 16px calc(env(safe-area-inset-bottom) + 18px);
+  box-shadow: 0 -8px 32px rgba(76, 59, 136, 0.18);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sheet-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; text-align: left;
+  padding: 16px 18px; border: 0; border-radius: 14px; cursor: pointer;
+  background: var(--bg); color: var(--text);
+  font-size: 1.05rem; font-weight: 600;
+}
+.sheet-item:hover { background: var(--accent-soft); color: var(--accent-hi); }
+.sync-row { justify-content: space-between; cursor: default; }
+.sync-row:hover { background: var(--bg); color: var(--text); }
 
 .hint-words {
   margin-top: 14px; padding: 11px 16px; text-align: center;
@@ -329,7 +346,6 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
   #screen-game.active { display: flex; flex-direction: column; }
   .game-top { order: 0; }
   #player-wrap { order: 1; }
-  .sync-bar { order: 2; justify-content: center; }
   #quiz-area { order: 3; }
   #feedback-area { order: 4; }
   .loop-bar { order: 5; }
