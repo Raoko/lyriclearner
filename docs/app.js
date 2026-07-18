@@ -354,6 +354,9 @@ async function startGame(perform = false) {
     game.party = { players: pendingParty.map(n => ({ name: n, score: 0, streak: 0 })), cur: 0, stealCount: 0 };
     pendingParty = null;
   }
+  game.fullRun = pendingFullRun;   // 🏁 whole song from the top; solo progress untouched
+  game.fullFirst = 0;              // lines nailed without needing a loop
+  pendingFullRun = false;
 
   // quiz every Nth line, starting with the very first
   game.lines.forEach((ln, i) => {
@@ -367,8 +370,9 @@ async function startGame(perform = false) {
 
   if (currentSong.mode === 'builder') {
     // builder tests one full line at a time, in order; a party always starts from the top
-    game.lines.forEach(ln => { ln.quiz = false; });
-    game.builderCount = game.party ? 0 : Math.min(currentSong.builderCount || 0, game.lines.length);
+    game.lines.forEach(ln => { ln.quiz = false; ln.looped = false; });
+    game.builderCount = (game.party || game.fullRun) ? 0
+      : Math.min(currentSong.builderCount || 0, game.lines.length);
     game.builderLine = -1;                  // line being tested / replayed
     game.builderGot = false;
     game.builderSkip = false;
@@ -718,6 +722,7 @@ function builderAnswer(got, skipped = false) {
 function startLineLoop() {
   if (!game || game.state !== 'quiz') return;
   const builder = currentSong.mode === 'builder';
+  if (builder) game.lines[game.builderLine].looped = true;   // needed help on this one
   game.repLine = builder ? game.builderLine : game.quizIdx;
   game.repFrom = Math.max(0, game.repLine - prefs.loopBack);   // rewind depth from settings
   game.revealIdx = game.repLine;
@@ -747,9 +752,10 @@ function builderLineEnded() {
   player.pauseVideo();
   game.revealIdx = null;
   if (game.builderGot) {
+    if (game.fullRun && !game.builderSkip && !game.lines[game.builderLine].looped) game.fullFirst++;
     game.builderCount++;
     if (!game.builderSkip) game.score += 5;
-    if (!game.party) {           // party runs don't touch your solo progress
+    if (!game.party && !game.fullRun) {   // party and test runs don't touch your solo progress
       currentSong.builderCount = game.builderCount;
       saveToLibrary(currentSong);
     }
@@ -801,6 +807,22 @@ function builderComplete() {
   }
 
   $('#party-results').classList.add('hidden');
+
+  if (game.fullRun) {
+    const acc = game.total ? Math.round((game.fullFirst / game.total) * 100) : 0;
+    $('#res-accuracy').textContent = acc + '%';
+    $('#res-score').textContent = game.fullFirst + '/' + game.total;
+    $('#res-streak').textContent = game.total - game.fullFirst;
+    $('#results-emoji').textContent = acc === 100 ? '🏆' : acc >= 80 ? '🏁' : '💪';
+    $('#results-title').textContent = acc === 100
+      ? 'Perfect full run — you own it!'
+      : `Full run — ${game.fullFirst}/${game.total} first try`;
+    if (!currentSong.bestScore || acc > currentSong.bestScore) currentSong.bestScore = acc;
+    saveToLibrary(currentSong);            // best score only; solo line progress untouched
+    showScreen('results');
+    return;
+  }
+
   $('#res-accuracy').textContent = '100%';
   $('#res-score').textContent = game.score;
   $('#res-streak').textContent = game.total;
@@ -826,7 +848,8 @@ function updateSpanBtn() {
 /* ---------- pass the mic (local party) ---------- */
 
 const ROSTER_KEY = 'lyriclearner.roster.v1';
-let pendingParty = null;   // names collected on the setup screen, consumed by startGame
+let pendingParty = null;     // names collected on the setup screen, consumed by startGame
+let pendingFullRun = false;  // next startGame is a full-song test run
 
 function showPartySetup() {
   const box = $('#party-names');
@@ -1099,6 +1122,8 @@ function openSheet() {
     : '🎤 Practice without vocals';
   $('#perform-item').classList.toggle('hidden', inParty || !(currentSong && currentSong.karaokeVideoId));
   $('#party-item').textContent = inParty ? '🚪 End party — back to solo' : '🎉 Pass the Mic — party';
+  $('#fullrun-item').textContent = game && game.fullRun ? '🧠 Back to practice' : '🏁 Full song run';
+  $('#fullrun-item').classList.toggle('hidden', inParty);
   $('#back-line-item').classList.toggle('hidden', inParty);
   $('#start-over-item').classList.toggle('hidden', inParty);
   $('#sheet-scrim').classList.remove('hidden');
@@ -1128,6 +1153,12 @@ $('#party-item').addEventListener('click', () => {
   closeSheet();
   if (game.party) startGame();   // end the party, back to solo practice
   else showPartySetup();
+});
+$('#fullrun-item').addEventListener('click', () => {
+  if (!game) return;
+  closeSheet();
+  pendingFullRun = !game.fullRun;   // toggle: test run from the top, or back to saved practice
+  startGame(game.karaoke);
 });
 $('#back-line-item').addEventListener('click', () => {
   if (!game) return;
@@ -1211,7 +1242,7 @@ function renderLyrics() {
 function updateStats() {
   // one calm number in the header; score and streak wait for the results screen
   const label = currentSong.mode === 'builder'
-    ? `${game.builderCount}/${game.total} lines${game.karaoke ? ' 🎤' : ''}`
+    ? `${game.builderCount}/${game.total} lines${game.karaoke ? ' 🎤' : ''}${game.fullRun ? ' 🏁' : ''}`
     : `${game.lines.filter(l => l.quiz && l.result !== null).length}/${game.total}`;
   $('#stat-progress').textContent = label;
 }
