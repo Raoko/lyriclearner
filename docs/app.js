@@ -592,17 +592,7 @@ function wrapLoop() {
 
 function onLineTap(i) {
   if (!game || game.state === 'done') return;
-  if (game.perform) {
-    // stuck? peek at a line for a moment — it costs you on the scoreboard
-    game.peeks++;
-    game.revealIdx = i;
-    updateStats();
-    renderLyrics();
-    setTimeout(() => {
-      if (game && game.revealIdx === i) { game.revealIdx = null; renderLyrics(); }
-    }, 2500);
-    return;
-  }
+  if (game.perform) return;   // karaoke just plays — nothing to tap
   if (currentSong.mode === 'builder') return;       // no section loops in builder mode
   if (game.loopStart !== null) return;              // loop active — use ✕ Clear loop
   if (game.loopSel === null) {
@@ -787,12 +777,11 @@ function performComplete() {
   game.state = 'done';
   clearInterval(game.ticker);
   try { player.pauseVideo(); } catch {}
-  const p = game.peeks;
-  $('#res-accuracy').textContent = Math.max(0, 100 - p * 5) + '%';
-  $('#res-score').textContent = game.total;
-  $('#res-streak').textContent = p;
-  $('#results-emoji').textContent = p === 0 ? '🏆' : p <= 3 ? '🎤' : '🎶';
-  $('#results-title').textContent = p === 0 ? 'Flawless — zero peeks!' : `Full run — ${p} peek${p === 1 ? '' : 's'}`;
+  $('#res-accuracy').textContent = '🎉';
+  $('#res-score').textContent = game.score;
+  $('#res-streak').textContent = game.total;
+  $('#results-emoji').textContent = '🎤';
+  $('#results-title').textContent = 'Full karaoke run!';
   showScreen('results');
 }
 
@@ -1014,7 +1003,7 @@ function openSheet() {
   const performing = !!(game && game.perform);
   $('#perform-item').textContent = performing
     ? '🧠 Back to practice'
-    : (currentSong && currentSong.karaokeVideoId ? '🎤 Perform — instrumental, no lyrics' : '🎤 Perform — no lyrics');
+    : (currentSong && currentSong.karaokeVideoId ? '🎤 Karaoke — instrumental + lyrics' : '🎤 Karaoke — sing along');
   $('#back-line-item').classList.toggle('hidden', performing);
   $('#start-over-item').classList.toggle('hidden', performing);
   $('#sheet-scrim').classList.remove('hidden');
@@ -1082,14 +1071,10 @@ function renderLyrics() {
     if (i === game.loopSel) div.classList.add('loop-sel');
     if (game.loopStart !== null && i >= game.loopStart && i <= game.loopEnd) div.classList.add('in-loop');
     div.addEventListener('click', () => onLineTap(i));
-    if (game.perform && i !== game.revealIdx) {
-      // perform mode: every line is cue bars — sing it from memory
-      div.classList.add(i === Math.max(0, game.idx - 1) ? 'current' : (i < game.idx ? 'past' : 'future'));
-      div.innerHTML = words(line.text)
-        .map(w => `<span class="w-blank">${escapeHtml(w.raw)}</span>`).join(' ');
-    } else if (game.perform) {
-      div.classList.add('current');
-      div.textContent = line.text;   // a peek
+    if (game.perform) {
+      // karaoke: full lyrics the whole way — you supply the vocals
+      div.classList.add(i === Math.max(0, game.idx - 1) ? 'current' : 'past');
+      div.textContent = line.text;
     } else if (currentSong.mode === 'builder' && game.state === 'quiz' && i === game.builderLine) {
       // the tested line: all blanks, recall it from memory
       div.classList.add('current');
@@ -1129,7 +1114,7 @@ function renderLyrics() {
 function updateStats() {
   // one calm number in the header; score and streak wait for the results screen
   const label = game.perform
-    ? (game.peeks ? `🎤 ${game.peeks} peek${game.peeks === 1 ? '' : 's'}` : '🎤 singing!')
+    ? '🎤 karaoke'
     : currentSong.mode === 'builder'
       ? `${game.builderCount}/${game.total} lines`
       : `${game.lines.filter(l => l.quiz && l.result !== null).length}/${game.total}`;
