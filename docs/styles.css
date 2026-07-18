@@ -294,6 +294,27 @@ input { font-size: 16px; }  /* below 16px, iOS Safari zooms in on focus */
 #feedback-line .verdict { display: block; font-size: 0.85rem; margin-top: 8px; color: var(--muted); }
 #feedback-area .btn-primary { margin-top: 14px; }
 
+/* ---------- Pass the Mic ---------- */
+#party-names { display: flex; flex-direction: column; gap: 10px; margin: 20px 0 14px; }
+.party-name {
+  padding: 13px 16px; font-size: 1rem;
+  background: var(--card); color: var(--text);
+  border: 1px solid var(--line); border-radius: 12px; outline: none;
+  box-shadow: var(--shadow);
+}
+.party-name:focus { border-color: var(--accent); }
+#screen-party .btn-primary { margin-top: 22px; }
+
+#party-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.party-chip {
+  padding: 7px 14px; border-radius: 999px; font-size: 0.85rem; font-weight: 600;
+  background: var(--card); color: var(--muted); border: 1px solid var(--line);
+}
+.party-chip.current { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+#party-results { margin: 18px 0 6px; font-size: 1.05rem; line-height: 2; }
+.party-row { text-align: center; }
+
 /* ---------- Full-screen lyrics ---------- */
 #screen-game.lyrics-full #lyrics-panel {
   position: fixed; inset: 0; z-index: 50;

@@ -10,7 +10,7 @@
   <title>LyricLearner</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icon-180.png">
-  <link rel="stylesheet" href="styles.css?v=20260717q">
+  <link rel="stylesheet" href="styles.css?v=20260717r">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
 </head>
 <body>
@@ -77,6 +77,19 @@
     <div id="setup-status" class="status"></div>
   </section>
 
+  <!-- ============ PARTY SETUP ============ -->
+  <section id="screen-party" class="screen">
+    <button class="back-btn" data-goto="home">← Back</button>
+    <h2>🎉 Pass the Mic</h2>
+    <p class="muted">Take turns singing the next line from memory. Nail it, keep the mic and the streak.
+    Miss it, and the next player can steal the same line for bonus points. Everyone misses? The song
+    reveals it — and the game rolls on.</p>
+    <div id="party-names"></div>
+    <button id="add-player-btn" class="btn-secondary">+ Add player</button>
+    <button id="party-start-btn" class="btn-primary">Start the party ▶</button>
+    <div id="party-status" class="status"></div>
+  </section>
+
   <!-- ============ GAME ============ -->
   <section id="screen-game" class="screen">
     <div class="game-top">
@@ -84,6 +97,7 @@
       <span id="stat-progress" class="progress-label">0/0</span>
       <button id="more-btn" class="chip" title="More options">⋯</button>
     </div>
+    <div id="party-bar" class="hidden"></div>
 
     <div id="player-wrap">
       <div id="yt-player"></div>
@@ -121,6 +135,7 @@
     <div id="more-sheet" class="hidden">
       <button id="fs-item" class="sheet-item">⛶ Full-screen lyrics</button>
       <button id="perform-item" class="sheet-item">🎤 Practice without vocals</button>
+      <button id="party-item" class="sheet-item">🎉 Pass the Mic — party</button>
       <button id="change-video-item" class="sheet-item">🎬 Change video</button>
       <button id="back-line-item" class="sheet-item">↶ Back a line</button>
       <button id="start-over-item" class="sheet-item">⏮ Start song over</button>
@@ -154,6 +169,7 @@
     <div class="results-card">
       <h2 id="results-emoji">🎉</h2>
       <h2 id="results-title">Nice work!</h2>
+      <div id="party-results" class="hidden"></div>
       <div class="results-stats">
         <div><b id="res-accuracy">0%</b><span>accuracy</span></div>
         <div><b id="res-score">0</b><span>points</span></div>
@@ -164,6 +180,6 @@
     </div>
   </section>
 
-  <script src="app.js?v=20260717q"></script>
+  <script src="app.js?v=20260717r"></script>
 </body>
 </html>

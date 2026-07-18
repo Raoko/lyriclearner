@@ -347,7 +347,13 @@ async function startGame(perform = false) {
     expectSeek: null,          // seek in flight: ignore stale clock readings until it lands
     videoError: false,
     karaoke: perform,          // 🎤 same practice flow, but over the instrumental — you sing the lines
+    party: null,               // 🎉 pass-the-mic: { players: [{name, score, streak}], cur, stealCount }
   };
+
+  if (pendingParty) {
+    game.party = { players: pendingParty.map(n => ({ name: n, score: 0, streak: 0 })), cur: 0, stealCount: 0 };
+    pendingParty = null;
+  }
 
   // quiz every Nth line, starting with the very first
   game.lines.forEach((ln, i) => {
@@ -360,9 +366,9 @@ async function startGame(perform = false) {
   game.total = game.lines.filter(l => l.quiz).length;
 
   if (currentSong.mode === 'builder') {
-    // builder tests one full line at a time, in order
+    // builder tests one full line at a time, in order; a party always starts from the top
     game.lines.forEach(ln => { ln.quiz = false; });
-    game.builderCount = Math.min(currentSong.builderCount || 0, game.lines.length);
+    game.builderCount = game.party ? 0 : Math.min(currentSong.builderCount || 0, game.lines.length);
     game.builderLine = -1;                  // line being tested / replayed
     game.builderGot = false;
     game.builderSkip = false;
@@ -373,6 +379,7 @@ async function startGame(perform = false) {
   renderLyrics();
   updateStats();
   updateLoopBar();
+  renderPartyBar();
   $('#quiz-area').classList.add('hidden');
   $('#feedback-area').classList.add('hidden');
   $('#start-overlay').classList.add('hidden');
@@ -681,9 +688,17 @@ function enterBuilderQuiz(target) {
   updateSpanBtn();
 
   const ws = words(game.lines[target].text);
-  $('#quiz-prompt').innerHTML =
-    `Line ${game.builderCount + 1}/${game.total}: ` +
-    promptWithBlanks(ws, ws.map((_, j) => j));
+  const blanks = promptWithBlanks(ws, ws.map((_, j) => j));
+  if (game.party) {
+    const p = game.party;
+    $('#quiz-prompt').innerHTML =
+      `🎤 <b>${escapeHtml(p.players[p.cur].name)}</b>${p.stealCount ? ' — steal it!' : ', you\'re up'}: ` + blanks;
+    $('#drive-miss').textContent = '✗ Missed — pass';
+    $('#skip-btn').classList.add('hidden');
+    $('#span-btn').classList.add('hidden');
+  } else {
+    $('#quiz-prompt').innerHTML = `Line ${game.builderCount + 1}/${game.total}: ` + blanks;
+  }
   renderLyrics();
 }
 
@@ -734,8 +749,10 @@ function builderLineEnded() {
   if (game.builderGot) {
     game.builderCount++;
     if (!game.builderSkip) game.score += 5;
-    currentSong.builderCount = game.builderCount;
-    saveToLibrary(currentSong);
+    if (!game.party) {           // party runs don't touch your solo progress
+      currentSong.builderCount = game.builderCount;
+      saveToLibrary(currentSong);
+    }
     updateStats();
     const next = builderTarget();
     if (next === null) return builderComplete();
@@ -767,6 +784,23 @@ function builderComplete() {
   game.state = 'done';
   clearInterval(game.ticker);
   try { player.pauseVideo(); } catch {}
+
+  if (game.party) {
+    const ranked = [...game.party.players].sort((a, b) => b.score - a.score);
+    $('#results-emoji').textContent = '🏆';
+    $('#results-title').textContent = `${ranked[0].name} wins!`;
+    $('#res-accuracy').textContent = ranked[0].score;
+    $('#res-score').textContent = game.total;
+    $('#res-streak').textContent = ranked.length;
+    const board = $('#party-results');
+    board.classList.remove('hidden');
+    board.innerHTML = ranked.map((pl, i) =>
+      `<div class="party-row">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '&nbsp;&nbsp;'} ${escapeHtml(pl.name)} — ${pl.score} pts</div>`).join('');
+    showScreen('results');
+    return;
+  }
+
+  $('#party-results').classList.add('hidden');
   $('#res-accuracy').textContent = '100%';
   $('#res-score').textContent = game.score;
   $('#res-streak').textContent = game.total;
@@ -787,6 +821,85 @@ $('#span-btn').addEventListener('click', () => {
 function updateSpanBtn() {
   $('#span-btn').textContent = currentSong.builderSpan === 'song'
     ? '↩ Restart: whole song' : '↩ Restart: 1 line back';
+}
+
+/* ---------- pass the mic (local party) ---------- */
+
+const ROSTER_KEY = 'lyriclearner.roster.v1';
+let pendingParty = null;   // names collected on the setup screen, consumed by startGame
+
+function showPartySetup() {
+  const box = $('#party-names');
+  box.innerHTML = '';
+  let names = [];
+  try { names = JSON.parse(localStorage.getItem(ROSTER_KEY)) || []; } catch {}
+  if (names.length < 2) names = [...names, '', ''].slice(0, 2);
+  names.forEach(n => addPartyNameInput(n));
+  $('#party-status').textContent = '';
+  showScreen('party');
+}
+
+function addPartyNameInput(value = '') {
+  const box = $('#party-names');
+  if (box.children.length >= 6) return;
+  const input = document.createElement('input');
+  input.className = 'party-name';
+  input.type = 'text';
+  input.placeholder = 'Player name';
+  input.value = value;
+  input.maxLength = 20;
+  box.appendChild(input);
+}
+
+$('#add-player-btn').addEventListener('click', () => addPartyNameInput());
+
+$('#party-start-btn').addEventListener('click', () => {
+  const names = [...document.querySelectorAll('.party-name')]
+    .map(i => i.value.trim()).filter(Boolean);
+  if (names.length < 2) {
+    $('#party-status').textContent = 'Enter at least two players.';
+    $('#party-status').classList.add('error');
+    return;
+  }
+  localStorage.setItem(ROSTER_KEY, JSON.stringify(names));
+  pendingParty = names;
+  startGame();
+});
+
+function renderPartyBar() {
+  const bar = $('#party-bar');
+  if (!game || !game.party) { bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  bar.innerHTML = '';
+  game.party.players.forEach((pl, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'party-chip' + (i === game.party.cur ? ' current' : '');
+    chip.textContent = `${pl.name} · ${pl.score}`;
+    bar.appendChild(chip);
+  });
+}
+
+function partyGot() {
+  const p = game.party, pl = p.players[p.cur];
+  pl.streak++;
+  pl.score += 10 + Math.min(pl.streak - 1, 5) * 2 + (p.stealCount > 0 ? 5 : 0);   // steal pays extra
+  p.stealCount = 0;
+  renderPartyBar();
+  builderAnswer(true);   // winner keeps the mic
+}
+
+function partyMiss() {
+  const p = game.party;
+  p.players[p.cur].streak = 0;
+  p.stealCount++;
+  p.cur = (p.cur + 1) % p.players.length;
+  renderPartyBar();
+  if (p.stealCount < p.players.length) {
+    enterBuilderQuiz(game.builderLine);   // same line, next singer — a steal
+  } else {
+    p.stealCount = 0;
+    builderAnswer(true, true);            // whole room missed: reveal it, play it, no points
+  }
 }
 
 /* ---------- quiz ---------- */
@@ -877,6 +990,7 @@ $('#hint-btn').addEventListener('click', () => {
 
 $('#drive-got').addEventListener('click', () => {
   if (!game || game.state !== 'quiz') return;
+  if (game.party) return partyGot();
   if (currentSong.mode === 'builder') return builderAnswer(true);
   const line = game.lines[game.quizIdx];
   // Next always counts as got it — repeats are learning, not failure
@@ -886,6 +1000,7 @@ $('#drive-got').addEventListener('click', () => {
 
 $('#drive-miss').addEventListener('click', () => {
   if (!game || game.state !== 'quiz' || !player) return;
+  if (game.party) return partyMiss();
   startLineLoop();   // same continuous listening loop in every mode
 });
 
@@ -978,10 +1093,14 @@ function openSheet() {
   }
   $('#fs-item').textContent = $('#screen-game').classList.contains('lyrics-full')
     ? '⛶ Exit full-screen lyrics' : '⛶ Full-screen lyrics';
+  const inParty = !!(game && game.party);
   $('#perform-item').textContent = game && game.karaoke
     ? '🎧 Practice with vocals'
     : '🎤 Practice without vocals';
-  $('#perform-item').classList.toggle('hidden', !(currentSong && currentSong.karaokeVideoId));
+  $('#perform-item').classList.toggle('hidden', inParty || !(currentSong && currentSong.karaokeVideoId));
+  $('#party-item').textContent = inParty ? '🚪 End party — back to solo' : '🎉 Pass the Mic — party';
+  $('#back-line-item').classList.toggle('hidden', inParty);
+  $('#start-over-item').classList.toggle('hidden', inParty);
   $('#sheet-scrim').classList.remove('hidden');
   $('#more-sheet').classList.remove('hidden');
 }
@@ -1003,6 +1122,12 @@ $('#perform-item').addEventListener('click', () => {
   if (!game) return;
   closeSheet();
   startGame(!game.karaoke);   // same practice, swap between the vocal track and the instrumental
+});
+$('#party-item').addEventListener('click', () => {
+  if (!game) return;
+  closeSheet();
+  if (game.party) startGame();   // end the party, back to solo practice
+  else showPartySetup();
 });
 $('#back-line-item').addEventListener('click', () => {
   if (!game) return;
@@ -1108,6 +1233,7 @@ function finishGame() {
   game.state = 'done';
   clearInterval(game.ticker);
   try { player.pauseVideo(); } catch {}
+  $('#party-results').classList.add('hidden');
 
   const correct = game.lines.filter(l => l.quiz).reduce((s, l) => s + (l.frac || 0), 0);
   const acc = game.total ? Math.round((correct / game.total) * 100) : 0;
