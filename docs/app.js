@@ -10,8 +10,8 @@ const STARTER_PACK = [
   { trackName: 'Ch y la Pizza', artistName: 'Fuerza Regida & Natanael Cano', lrclibId: 34414351, videoId: 'lvdwUbP_Vug' },
   { trackName: 'Tití Me Preguntó', artistName: 'Bad Bunny', lrclibId: 17906524, videoId: 'qBUKfQRbzuk' },
   { trackName: 'Me Porto Bonito', artistName: 'Bad Bunny ft. Chencho Corleone', lrclibId: 20453735, videoId: 'OblNX5rGJJM' },
-  { trackName: 'Dákiti', artistName: 'Bad Bunny & Jhay Cortez', lrclibId: 576, videoId: '30YlLGeUReY' },
-  { trackName: 'Callaíta', artistName: 'Bad Bunny', lrclibId: 1004116, videoId: 'RFE6v8FpfWs' },
+  { trackName: 'Dákiti', artistName: 'Bad Bunny & Jhay Cortez', lrclibId: 576, videoId: '30YlLGeUReY', karaokeVideoId: 'w4yksV18bew' },
+  { trackName: 'Callaíta', artistName: 'Bad Bunny', lrclibId: 1004116, videoId: 'RFE6v8FpfWs', karaokeVideoId: 'pOGi8ar_XKg' },
   { trackName: 'Ojitos Lindos', artistName: 'Bad Bunny ft. Bomba Estéreo', lrclibId: 22269344, videoId: 'mJfkCSTNLhY' },
   { trackName: 'Efecto', artistName: 'Bad Bunny', lrclibId: 584, videoId: 'T71O6XB6qE8' },
   { trackName: 'Moscow Mule', artistName: 'Bad Bunny', lrclibId: 20667007, videoId: 'vgGM87RcRko' },
@@ -173,6 +173,7 @@ function renderStarterPack() {
             saved.videoId = s.videoId;
             saved.offset = 0;          // old offset was tuned to the old video
           }
+          saved.karaokeVideoId = s.karaokeVideoId;
           return openSetup(saved);
         }
         const res = await fetch(`${LRCLIB}/get/${s.lrclibId}`);
@@ -184,6 +185,7 @@ function renderStarterPack() {
           artistName: s.artistName,
           syncedLyrics: data.syncedLyrics,
           videoId: s.videoId,
+          karaokeVideoId: s.karaokeVideoId,
           offset: 0,
         });
       } catch (err) {
@@ -319,7 +321,7 @@ const LEAD = 0.35;         // pause this many seconds before the quizzed line st
                            // (pauseVideo has real latency — too small and you hear the first word)
 const TICK_MS = 80;
 
-async function startGame() {
+async function startGame(perform = false) {
   const lines = parseLRC(currentSong.syncedLyrics);
   if (lines.length < 4) {
     $('#setup-status').textContent = 'These lyrics have too few synced lines to play.';
@@ -344,6 +346,8 @@ async function startGame() {
     ticker: null,
     expectSeek: null,          // seek in flight: ignore stale clock readings until it lands
     videoError: false,
+    perform,                   // 🎤 perform mode: whole song, no pauses, no lyrics — tap a line to peek
+    peeks: 0,
   };
 
   // quiz every Nth line, starting with the very first
@@ -379,7 +383,8 @@ async function startGame() {
   await ensureYouTubeAPI();
   if (player) { player.destroy(); player = null; }
   player = new YT.Player('yt-player', {
-    videoId: currentSong.videoId,
+    // perform mode prefers the paired instrumental, singing over the original otherwise
+    videoId: (perform && currentSong.karaokeVideoId) || currentSong.videoId,
     playerVars: { playsinline: 1, rel: 0, controls: 0, disablekb: 1 },
     events: {
       // iOS blocks autoplay with sound — playback must start from a real tap
@@ -398,7 +403,9 @@ async function startGame() {
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
           if (isAdPlaying()) return;   // an ad finishing is not the song finishing
-          if (game.state === 'linerepeat') {
+          if (game.perform) {
+            performComplete();
+          } else if (game.state === 'linerepeat') {
             gameSeek(lineTime(game.repFrom) - 0.5);
             player.playVideo();
           } else if (currentSong.mode === 'builder') {
@@ -429,6 +436,11 @@ $('#start-overlay').addEventListener('click', () => {
   if (game.videoError) return gotoVideoPicker();
   $('#start-overlay').classList.add('hidden');
   showGraceNote();
+  if (game.perform) {
+    game.state = 'playing';
+    player.playVideo();
+    return;
+  }
   if (currentSong.mode === 'builder') {
     if (builderTarget() !== null) restartBuilderPass();
     else builderComplete();               // song already fully built
@@ -515,8 +527,8 @@ function tick() {
 
   if (game.state !== 'playing') return;
 
-  // builder mode: pause right before the line being learned
-  if (currentSong.mode === 'builder') {
+  // builder mode: pause right before the line being learned (never during a performance)
+  if (currentSong.mode === 'builder' && !game.perform) {
     const target = builderTarget();
     if (target !== null && t >= lineTime(target) - LEAD) {
       player.pauseVideo();
@@ -546,7 +558,8 @@ function tick() {
     game.idx++;
     renderLyrics();
   }
-  if (game.idx >= game.lines.length && game.loopStart === null) finishGame();
+  // in perform mode the outro plays through; the ENDED event closes the run
+  if (game.idx >= game.lines.length && game.loopStart === null && !game.perform) finishGame();
 }
 
 /* ---------- A-B section loop ---------- */
@@ -579,6 +592,17 @@ function wrapLoop() {
 
 function onLineTap(i) {
   if (!game || game.state === 'done') return;
+  if (game.perform) {
+    // stuck? peek at a line for a moment — it costs you on the scoreboard
+    game.peeks++;
+    game.revealIdx = i;
+    updateStats();
+    renderLyrics();
+    setTimeout(() => {
+      if (game && game.revealIdx === i) { game.revealIdx = null; renderLyrics(); }
+    }, 2500);
+    return;
+  }
   if (currentSong.mode === 'builder') return;       // no section loops in builder mode
   if (game.loopStart !== null) return;              // loop active — use ✕ Clear loop
   if (game.loopSel === null) {
@@ -757,6 +781,19 @@ function restartBuilderPass() {
   const pre = startLine === target ? 3 : 1;
   gameSeek(lineTime(startLine) - pre);
   player.playVideo();
+}
+
+function performComplete() {
+  game.state = 'done';
+  clearInterval(game.ticker);
+  try { player.pauseVideo(); } catch {}
+  const p = game.peeks;
+  $('#res-accuracy').textContent = Math.max(0, 100 - p * 5) + '%';
+  $('#res-score').textContent = game.total;
+  $('#res-streak').textContent = p;
+  $('#results-emoji').textContent = p === 0 ? '🏆' : p <= 3 ? '🎤' : '🎶';
+  $('#results-title').textContent = p === 0 ? 'Flawless — zero peeks!' : `Full run — ${p} peek${p === 1 ? '' : 's'}`;
+  showScreen('results');
 }
 
 function builderComplete() {
@@ -974,6 +1011,12 @@ function openSheet() {
   }
   $('#fs-item').textContent = $('#screen-game').classList.contains('lyrics-full')
     ? '⛶ Exit full-screen lyrics' : '⛶ Full-screen lyrics';
+  const performing = !!(game && game.perform);
+  $('#perform-item').textContent = performing
+    ? '🧠 Back to practice'
+    : (currentSong && currentSong.karaokeVideoId ? '🎤 Perform — instrumental, no lyrics' : '🎤 Perform — no lyrics');
+  $('#back-line-item').classList.toggle('hidden', performing);
+  $('#start-over-item').classList.toggle('hidden', performing);
   $('#sheet-scrim').classList.remove('hidden');
   $('#more-sheet').classList.remove('hidden');
 }
@@ -990,6 +1033,11 @@ $('#fs-item').addEventListener('click', () => {
 $('#change-video-item').addEventListener('click', () => {
   closeSheet();
   gotoVideoPicker();
+});
+$('#perform-item').addEventListener('click', () => {
+  if (!game) return;
+  closeSheet();
+  startGame(!game.perform);   // toggle between practice and performance
 });
 $('#back-line-item').addEventListener('click', () => {
   if (!game) return;
@@ -1034,7 +1082,15 @@ function renderLyrics() {
     if (i === game.loopSel) div.classList.add('loop-sel');
     if (game.loopStart !== null && i >= game.loopStart && i <= game.loopEnd) div.classList.add('in-loop');
     div.addEventListener('click', () => onLineTap(i));
-    if (currentSong.mode === 'builder' && game.state === 'quiz' && i === game.builderLine) {
+    if (game.perform && i !== game.revealIdx) {
+      // perform mode: every line is cue bars — sing it from memory
+      div.classList.add(i === Math.max(0, game.idx - 1) ? 'current' : (i < game.idx ? 'past' : 'future'));
+      div.innerHTML = words(line.text)
+        .map(w => `<span class="w-blank">${escapeHtml(w.raw)}</span>`).join(' ');
+    } else if (game.perform) {
+      div.classList.add('current');
+      div.textContent = line.text;   // a peek
+    } else if (currentSong.mode === 'builder' && game.state === 'quiz' && i === game.builderLine) {
       // the tested line: all blanks, recall it from memory
       div.classList.add('current');
       div.innerHTML = words(line.text)
@@ -1072,9 +1128,11 @@ function renderLyrics() {
 
 function updateStats() {
   // one calm number in the header; score and streak wait for the results screen
-  const label = currentSong.mode === 'builder'
-    ? `${game.builderCount}/${game.total} lines`
-    : `${game.lines.filter(l => l.quiz && l.result !== null).length}/${game.total}`;
+  const label = game.perform
+    ? (game.peeks ? `🎤 ${game.peeks} peek${game.peeks === 1 ? '' : 's'}` : '🎤 singing!')
+    : currentSong.mode === 'builder'
+      ? `${game.builderCount}/${game.total} lines`
+      : `${game.lines.filter(l => l.quiz && l.result !== null).length}/${game.total}`;
   $('#stat-progress').textContent = label;
 }
 
