@@ -346,8 +346,7 @@ async function startGame(perform = false) {
     ticker: null,
     expectSeek: null,          // seek in flight: ignore stale clock readings until it lands
     videoError: false,
-    perform,                   // 🎤 perform mode: whole song, no pauses, no lyrics — tap a line to peek
-    peeks: 0,
+    karaoke: perform,          // 🎤 same practice flow, but over the instrumental — you sing the lines
   };
 
   // quiz every Nth line, starting with the very first
@@ -403,9 +402,7 @@ async function startGame(perform = false) {
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.ENDED && game && game.state !== 'done') {
           if (isAdPlaying()) return;   // an ad finishing is not the song finishing
-          if (game.perform) {
-            performComplete();
-          } else if (game.state === 'linerepeat') {
+          if (game.state === 'linerepeat') {
             gameSeek(lineTime(game.repFrom) - 0.5);
             player.playVideo();
           } else if (currentSong.mode === 'builder') {
@@ -436,11 +433,6 @@ $('#start-overlay').addEventListener('click', () => {
   if (game.videoError) return gotoVideoPicker();
   $('#start-overlay').classList.add('hidden');
   showGraceNote();
-  if (game.perform) {
-    game.state = 'playing';
-    player.playVideo();
-    return;
-  }
   if (currentSong.mode === 'builder') {
     if (builderTarget() !== null) restartBuilderPass();
     else builderComplete();               // song already fully built
@@ -527,8 +519,8 @@ function tick() {
 
   if (game.state !== 'playing') return;
 
-  // builder mode: pause right before the line being learned (never during a performance)
-  if (currentSong.mode === 'builder' && !game.perform) {
+  // builder mode: pause right before the line being learned
+  if (currentSong.mode === 'builder') {
     const target = builderTarget();
     if (target !== null && t >= lineTime(target) - LEAD) {
       player.pauseVideo();
@@ -558,8 +550,7 @@ function tick() {
     game.idx++;
     renderLyrics();
   }
-  // in perform mode the outro plays through; the ENDED event closes the run
-  if (game.idx >= game.lines.length && game.loopStart === null && !game.perform) finishGame();
+  if (game.idx >= game.lines.length && game.loopStart === null) finishGame();
 }
 
 /* ---------- A-B section loop ---------- */
@@ -592,7 +583,6 @@ function wrapLoop() {
 
 function onLineTap(i) {
   if (!game || game.state === 'done') return;
-  if (game.perform) return;   // karaoke just plays — nothing to tap
   if (currentSong.mode === 'builder') return;       // no section loops in builder mode
   if (game.loopStart !== null) return;              // loop active — use ✕ Clear loop
   if (game.loopSel === null) {
@@ -773,18 +763,6 @@ function restartBuilderPass() {
   player.playVideo();
 }
 
-function performComplete() {
-  game.state = 'done';
-  clearInterval(game.ticker);
-  try { player.pauseVideo(); } catch {}
-  $('#res-accuracy').textContent = '🎉';
-  $('#res-score').textContent = game.score;
-  $('#res-streak').textContent = game.total;
-  $('#results-emoji').textContent = '🎤';
-  $('#results-title').textContent = 'Full karaoke run!';
-  showScreen('results');
-}
-
 function builderComplete() {
   game.state = 'done';
   clearInterval(game.ticker);
@@ -792,8 +770,8 @@ function builderComplete() {
   $('#res-accuracy').textContent = '100%';
   $('#res-score').textContent = game.score;
   $('#res-streak').textContent = game.total;
-  $('#results-emoji').textContent = '🧠';
-  $('#results-title').textContent = 'Every line memorized!';
+  $('#results-emoji').textContent = game.karaoke ? '🎤' : '🧠';
+  $('#results-title').textContent = game.karaoke ? 'Whole song, a cappella!' : 'Every line memorized!';
   currentSong.bestScore = 100;
   currentSong.builderCount = 0;            // fresh start next run
   saveToLibrary(currentSong);
@@ -1000,12 +978,10 @@ function openSheet() {
   }
   $('#fs-item').textContent = $('#screen-game').classList.contains('lyrics-full')
     ? '⛶ Exit full-screen lyrics' : '⛶ Full-screen lyrics';
-  const performing = !!(game && game.perform);
-  $('#perform-item').textContent = performing
-    ? '🧠 Back to practice'
-    : (currentSong && currentSong.karaokeVideoId ? '🎤 Karaoke — instrumental + lyrics' : '🎤 Karaoke — sing along');
-  $('#back-line-item').classList.toggle('hidden', performing);
-  $('#start-over-item').classList.toggle('hidden', performing);
+  $('#perform-item').textContent = game && game.karaoke
+    ? '🎧 Practice with vocals'
+    : '🎤 Practice without vocals';
+  $('#perform-item').classList.toggle('hidden', !(currentSong && currentSong.karaokeVideoId));
   $('#sheet-scrim').classList.remove('hidden');
   $('#more-sheet').classList.remove('hidden');
 }
@@ -1026,7 +1002,7 @@ $('#change-video-item').addEventListener('click', () => {
 $('#perform-item').addEventListener('click', () => {
   if (!game) return;
   closeSheet();
-  startGame(!game.perform);   // toggle between practice and performance
+  startGame(!game.karaoke);   // same practice, swap between the vocal track and the instrumental
 });
 $('#back-line-item').addEventListener('click', () => {
   if (!game) return;
@@ -1071,11 +1047,7 @@ function renderLyrics() {
     if (i === game.loopSel) div.classList.add('loop-sel');
     if (game.loopStart !== null && i >= game.loopStart && i <= game.loopEnd) div.classList.add('in-loop');
     div.addEventListener('click', () => onLineTap(i));
-    if (game.perform) {
-      // karaoke: full lyrics the whole way — you supply the vocals
-      div.classList.add(i === Math.max(0, game.idx - 1) ? 'current' : 'past');
-      div.textContent = line.text;
-    } else if (currentSong.mode === 'builder' && game.state === 'quiz' && i === game.builderLine) {
+    if (currentSong.mode === 'builder' && game.state === 'quiz' && i === game.builderLine) {
       // the tested line: all blanks, recall it from memory
       div.classList.add('current');
       div.innerHTML = words(line.text)
@@ -1113,11 +1085,9 @@ function renderLyrics() {
 
 function updateStats() {
   // one calm number in the header; score and streak wait for the results screen
-  const label = game.perform
-    ? '🎤 karaoke'
-    : currentSong.mode === 'builder'
-      ? `${game.builderCount}/${game.total} lines`
-      : `${game.lines.filter(l => l.quiz && l.result !== null).length}/${game.total}`;
+  const label = currentSong.mode === 'builder'
+    ? `${game.builderCount}/${game.total} lines${game.karaoke ? ' 🎤' : ''}`
+    : `${game.lines.filter(l => l.quiz && l.result !== null).length}/${game.total}`;
   $('#stat-progress').textContent = label;
 }
 
