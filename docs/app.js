@@ -1128,10 +1128,13 @@ function openSheet() {
   $('#start-over-item').classList.toggle('hidden', inParty);
   $('#sheet-scrim').classList.remove('hidden');
   $('#more-sheet').classList.remove('hidden');
+  $('#more-sheet').scrollTop = 0;
+  document.body.style.overflow = 'hidden';   // the page behind must not scroll-trap the sheet
 }
 function closeSheet() {
   $('#sheet-scrim').classList.add('hidden');
   $('#more-sheet').classList.add('hidden');
+  document.body.style.overflow = '';
 }
 $('#more-btn').addEventListener('click', openSheet);
 $('#sheet-scrim').addEventListener('click', closeSheet);
